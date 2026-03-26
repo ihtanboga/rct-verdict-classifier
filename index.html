@@ -7,41 +7,51 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 :root{
-  --primary:#15736b;--primary-deep:#0d3f3d;--primary-light:#e8f5f4;
-  --accent:#c5673a;--bg:#f7f6f2;--card:#ffffff;--border:#e2e1da;
-  --text:#1a1a18;--muted:#6b6b68;--radius:10px;
+  --primary:#15736b;--primary-deep:#0d3f3d;--primary-light:#ddf3ee;--primary-soft:#f2faf8;
+  --accent:#c5673a;--accent-soft:#f8e3d6;
+  --canvas:#f4efe7;--canvas-deep:#e7ddd0;
+  --card:rgba(255,255,255,.94);--surface:#ffffff;--surface-alt:#f7fbfa;
+  --text:#18333f;--text-light:#5d707a;
+  --border:rgba(24,51,63,.12);--radius:22px;
+  --shadow:0 18px 60px rgba(24,51,63,.08);
+  --danger:#b53a31;--success:#17775d;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6}
-.hero{background:linear-gradient(135deg,var(--primary-deep) 0%,var(--primary) 100%);color:#fff;padding:36px 24px 28px;text-align:center}
-.hero h1{font-size:1.7rem;font-weight:700;margin-bottom:6px}
-.hero p{opacity:.85;font-size:.95rem;max-width:640px;margin:0 auto 8px}
-.hero .author{font-size:.78rem;opacity:.55;margin-top:4px}
-.container{max-width:920px;margin:0 auto;padding:24px 16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
-.card-title{font-size:1rem;font-weight:600;color:var(--primary-deep);margin-bottom:16px;display:flex;align-items:center;gap:8px}
-.card-title::before{content:'';display:inline-block;width:3px;height:18px;background:var(--primary);border-radius:2px}
+body{font-family:"Avenir Next","Segoe UI",sans-serif;color:var(--text);font-size:15px;line-height:1.6;
+  background:radial-gradient(circle at top left,rgba(197,103,58,.10),transparent 26%),radial-gradient(circle at top right,rgba(21,115,107,.12),transparent 30%),linear-gradient(180deg,#fbf8f3 0%,var(--canvas) 100%)}
+h1,h2,h3{font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",serif;letter-spacing:-.02em}
+.hero{padding:48px 0 30px;text-align:center;color:#fff;
+  background:radial-gradient(circle at 15% 15%,rgba(255,255,255,.16),transparent 20%),radial-gradient(circle at 85% 18%,rgba(255,255,255,.12),transparent 20%),linear-gradient(135deg,#0c2f37 0%,#13525a 36%,#15736b 100%)}
+.hero h1{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;margin-bottom:6px}
+.hero .author{font-size:.78rem;opacity:.5;margin-top:4px}
+.container{width:min(960px,calc(100% - 40px));margin:0 auto;padding:24px 0 64px}
+.card{background:var(--card);border:1px solid rgba(24,51,63,.08);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-bottom:20px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--primary-deep),var(--primary),var(--accent));border-radius:var(--radius) var(--radius) 0 0}
+.card-title{font-size:1.1rem;font-weight:600;color:var(--primary-deep);margin-bottom:16px}
+.card-kicker{display:block;font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-light);margin-bottom:4px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
-label{display:block;font-size:.85rem;font-weight:500;color:var(--muted);margin-bottom:4px}
-input[type=number],input[type=text],select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.95rem;background:#fff;color:var(--text);outline:none;transition:border .15s}
-input:focus,select:focus{border-color:var(--primary)}
-.radio-group{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px}
-.radio-group label{font-weight:400;color:var(--text);display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:0}
-.hint{font-size:.78rem;color:var(--muted);margin-top:3px}
-.btn-primary{background:var(--primary);color:#fff;border:none;padding:13px 32px;font-size:1rem;font-weight:600;border-radius:8px;cursor:pointer;width:100%;margin-top:8px;transition:background .15s}
-.btn-primary:hover{background:var(--primary-deep)}
-.btn-secondary{background:#fff;color:var(--primary);border:2px solid var(--primary);padding:10px 24px;font-size:.9rem;font-weight:600;border-radius:8px;cursor:pointer;transition:all .15s}
-.btn-secondary:hover{background:var(--primary-light)}
+label{display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-light);margin-bottom:6px}
+input[type=number],input[type=text],select{width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;font-size:.96rem;background:#fbfcfb;color:var(--text);outline:none;transition:all .2s}
+input:focus,select:focus{border-color:rgba(21,115,107,.55);box-shadow:0 0 0 4px rgba(21,115,107,.12);transform:translateY(-1px)}
+.radio-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.radio-group label{font-weight:600;font-size:.92rem;color:var(--text);display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:0;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--surface);text-transform:none;letter-spacing:0;transition:.2s}
+.radio-group label:has(input:checked){background:var(--primary-deep);color:#fff;border-color:var(--primary-deep);box-shadow:0 10px 24px rgba(13,63,61,.18)}
+.radio-group input[type=radio]{display:none}
+.hint{font-size:.75rem;color:var(--text-light);margin-top:3px;font-weight:400;text-transform:none;letter-spacing:0}
+.btn-primary{background:linear-gradient(135deg,var(--primary-deep),var(--primary));color:#fff;border:none;padding:14px 28px;font-size:.95rem;font-weight:700;border-radius:999px;cursor:pointer;width:100%;margin-top:12px;box-shadow:0 14px 28px rgba(13,63,61,.22);transition:all .2s}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 18px 36px rgba(13,63,61,.28)}
+.btn-secondary{background:rgba(255,255,255,.76);color:var(--primary-deep);border:1px solid rgba(21,115,107,.18);padding:12px 24px;font-size:.9rem;font-weight:700;border-radius:999px;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{background:var(--primary-light);border-color:var(--primary)}
 /* Presets */
 .presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-.preset-btn{padding:6px 14px;border:1px solid var(--border);border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;background:#fafaf8;color:var(--text);transition:all .15s}
-.preset-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.preset-btn{padding:8px 16px;border:1px solid var(--border);border-radius:999px;font-size:.82rem;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);transition:all .2s}
+.preset-btn:hover{border-color:var(--primary);color:var(--primary-deep);background:var(--primary-light);box-shadow:0 4px 12px rgba(21,115,107,.1)}
 /* Verdict */
-.verdict-banner{border-radius:var(--radius);padding:22px 24px;margin-bottom:20px;border-width:2px;border-style:solid}
-.verdict-class{font-size:1.6rem;font-weight:700;letter-spacing:.5px}
-.verdict-study{font-size:1rem;font-weight:500;margin:4px 0 8px;opacity:.85}
-.verdict-tagline{font-size:.9rem;opacity:.8}
+.verdict-banner{border-radius:var(--radius);padding:24px 28px;margin-bottom:20px;border-width:2px;border-style:solid;box-shadow:var(--shadow)}
+.verdict-class{font-size:clamp(1.4rem,3vw,1.8rem);font-weight:700;letter-spacing:-.01em}
+.verdict-study{font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.95rem;font-weight:500;margin:6px 0 8px;opacity:.85}
+.verdict-tagline{font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.88rem;opacity:.75;line-height:1.5}
 .verdict-POSITIVE{background:#f0fdf4;border-color:#86efac;color:#14532d}
 .verdict-IMPRECISE_POSITIVE{background:#eff6ff;border-color:#93c5fd;color:#1e3a8a}
 .verdict-NEUTRAL{background:#f9fafb;border-color:#d1d5db;color:#374151}
@@ -57,9 +67,12 @@ input:focus,select:focus{border-color:var(--primary)}
 .step-text{font-size:.88rem;color:var(--text);padding-top:3px}
 .step-verdict{font-weight:600;color:var(--primary)}
 /* Table */
-.bayes-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:12px}
-.bayes-table th{background:#f5f4f0;padding:8px 10px;text-align:left;font-weight:600;border-bottom:2px solid var(--border);color:var(--muted);white-space:nowrap}
-.bayes-table td{padding:8px 10px;border-bottom:1px solid #f0efe9}
+.table-wrap{overflow:auto;border-radius:20px;border:1px solid rgba(24,51,63,.08);background:var(--surface-alt)}
+.bayes-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.bayes-table th{background:var(--primary-deep);color:#fff;padding:14px 10px;text-align:center;font-weight:700;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+.bayes-table td{padding:12px 10px;text-align:center;border-bottom:1px solid rgba(24,51,63,.08)}
+.bayes-table tr:nth-child(even){background:#f8fbfa}
+.bayes-table tr:hover{background:var(--primary-light)}
 .bayes-table tr:last-child td{border-bottom:none}
 .cell-green{background:#f0fdf4;color:#14532d;font-weight:600}
 .cell-yellow{background:#fefce8;color:#713f12;font-weight:600}
@@ -69,13 +82,8 @@ input:focus,select:focus{border-color:var(--primary)}
 .fingerprint{margin-top:16px;padding:14px 18px;background:#f0f9f8;border:1px solid #cce8e5;border-radius:8px;font-size:.88rem}
 .fingerprint strong{color:var(--primary-deep)}
 .fp-match{display:inline-block;padding:3px 12px;border-radius:12px;font-size:.8rem;font-weight:600;margin-left:6px}
-/* SVG figures */
-.fig-section{margin-top:8px}
-.fig-item{margin-bottom:28px}
-.fig-label{font-size:.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-left:2px}
-.fig-object{width:100%;border:1px solid var(--border);border-radius:8px;background:#fafaf8;display:block}
 /* Narrative */
-.narrative{font-size:.9rem;line-height:1.7;color:#2a2a28;background:#f9f9f7;border-left:3px solid var(--primary);padding:14px 18px;border-radius:0 8px 8px 0;margin-top:12px}
+.narrative{font-size:.9rem;line-height:1.7;color:var(--text);background:var(--primary-soft);border:1px solid rgba(21,115,107,.12);border-left:4px solid var(--primary);padding:16px 20px;border-radius:0 18px 18px 0;margin-top:14px}
 .narrative strong{color:var(--primary-deep)}
 /* Download */
 .download-row{display:flex;justify-content:center;padding:8px 0 4px}
@@ -86,7 +94,6 @@ input:focus,select:focus{border-color:var(--primary)}
 
 <div class="hero">
   <h1>RCT Verdict Classifier</h1>
-  <p>CI + MCID Framework · Bayesian Complementary Analysis · Zampieri/Harrell Method</p>
   <div class="author">Prof. Ibrahim Halil Tanboga, MD, PhD — Nisantasi University Medical School</div>
 </div>
 
@@ -94,12 +101,10 @@ input:focus,select:focus{border-color:var(--primary)}
 
 <!-- INPUT -->
 <div class="card" id="inputCard">
-  <div class="card-title">Trial Input</div>
+  <span class="card-kicker">Data Entry</span>
+  <h2 class="card-title">Trial Input</h2>
 
-  <div style="margin-bottom:14px">
-    <label style="margin-bottom:6px">Quick Examples (from framework)</label>
-    <div class="presets" id="presetBar"></div>
-  </div>
+  <div class="presets" id="presetBar" style="margin-bottom:14px"></div>
 
   <div class="form-grid" style="margin-bottom:14px">
     <div>
@@ -171,22 +176,20 @@ input:focus,select:focus{border-color:var(--primary)}
 <div id="resultsSection" style="display:none">
   <div id="verdictBanner"></div>
   <div class="card">
-    <div class="card-title">Frequentist Classification — CI + MCID</div>
+    <span class="card-kicker">Frequentist Track</span>
+    <h2 class="card-title">CI + MCID Classification</h2>
     <div id="ciForestPlot"></div>
     <div id="freqReasoning" style="margin-top:16px"></div>
   </div>
   <div class="card">
-    <div class="card-title">Bayesian Complementary Analysis</div>
+    <span class="card-kicker">Bayesian Track</span>
+    <h2 class="card-title">Posterior Analysis</h2>
     <div id="posteriorDensityPlot"></div>
     <div id="cdfPlot" style="margin-top:12px"></div>
     <div id="forestPlot" style="margin-top:12px"></div>
-    <div id="bayesTableContainer" style="margin-top:16px;overflow-x:auto"></div>
+    <div id="bayesTableContainer" class="table-wrap" style="margin-top:16px"></div>
     <div id="bayesFingerprint"></div>
     <div id="bayesNarrative"></div>
-  </div>
-  <div class="card" id="figuresCard" style="display:none">
-    <div class="card-title">Framework Reference Figures</div>
-    <div id="educationalFigures" class="fig-section"></div>
   </div>
   <div class="download-row">
     <button class="btn-secondary" onclick="downloadReport()">Download Full Report (HTML)</button>
@@ -637,27 +640,6 @@ function renderFingerprint(br,freqVerdict){
   </div>`;
 }
 
-// ============================================================
-// EDUCATIONAL FIGURES
-// ============================================================
-const FIG_PATH='figures/';
-const FIGS={
-  decision:{f:'ci_mcid_decision_algorithm.svg',l:'Decision Algorithm: Classifying a Completed RCT'},
-  scenarios:{f:'ci_mcid_classification_scenarios.svg',l:'CI + MCID: 6 Classification Scenarios'},
-  three:{f:'p_nonsig_three_scenarios_english.svg',l:'Three Faces of p > 0.05'},
-  negvsneu:{f:'negative_vs_neutral_comparison.svg',l:'Negative vs Neutral: What Does the CI Exclude?'},
-  underpwr:{f:'underpowered_visual_explanation.svg',l:'Underpowered Trials: Wide CIs Conceal the Truth'}
-};
-
-function renderFigures(verdict){
-  const c=document.getElementById('educationalFigures');c.innerHTML='';
-  const show=['decision','scenarios'];
-  if(!verdict.exNull)show.push('three');
-  if(verdict.verdict==='NEGATIVE')show.push('negvsneu');
-  if(verdict.verdict==='INCONCLUSIVE_UNDERPOWERED')show.push('underpwr');
-  show.forEach(k=>{const f=FIGS[k];c.innerHTML+=`<div class="fig-item"><div class="fig-label">${f.l}</div><object class="fig-object" data="${FIG_PATH}${f.f}" type="image/svg+xml" style="height:auto;min-height:280px"></object></div>`;});
-  document.getElementById('figuresCard').style.display='';
-}
 
 // ============================================================
 // VERDICT BANNER
@@ -691,7 +673,6 @@ function runClassifier(){
   renderPosterior(br,d);renderCDF(br,d);renderForestBayes(br,d,I2);renderTable(br,d.measure);
   renderFingerprint(br,v);
   document.getElementById('bayesNarrative').innerHTML=bayesNarrative(br,I2,d.mcidBenefit,d.measure);
-  renderFigures(v);
   document.getElementById('resultsSection').style.display='';
   document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
 }
