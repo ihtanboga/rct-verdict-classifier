@@ -3,718 +3,1792 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RCT Verdict Classifier — CI + MCID + Bayesian</title>
+<title>RCT Verdict Classifier - CI + MCID</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
-:root{
-  --primary:#15736b;--primary-deep:#0d3f3d;--primary-light:#ddf3ee;--primary-soft:#f2faf8;
-  --accent:#c5673a;--accent-soft:#f8e3d6;
-  --canvas:#f4efe7;--canvas-deep:#e7ddd0;
-  --card:rgba(255,255,255,.94);--surface:#ffffff;--surface-alt:#f7fbfa;
-  --text:#18333f;--text-light:#5d707a;
-  --border:rgba(24,51,63,.12);--radius:22px;
-  --shadow:0 18px 60px rgba(24,51,63,.08);
-  --danger:#b53a31;--success:#17775d;
+:root {
+  --ink: #122531;
+  --muted: #5f7078;
+  --teal-900: #0d3741;
+  --teal-700: #15736b;
+  --teal-500: #2f9f91;
+  --teal-100: #dff3ee;
+  --orange-600: #c56d37;
+  --orange-100: #f8e4d6;
+  --paper: #f5efe6;
+  --paper-deep: #ebe1d4;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --border: rgba(18, 37, 49, 0.10);
+  --shadow: 0 18px 60px rgba(18, 37, 49, 0.08);
+  --radius-xl: 30px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --success: #17775d;
+  --warning: #9a6a17;
+  --danger: #b53a31;
+  --neutral: #6a7280;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Avenir Next","Segoe UI",sans-serif;color:var(--text);font-size:15px;line-height:1.6;
-  background:radial-gradient(circle at top left,rgba(197,103,58,.10),transparent 26%),radial-gradient(circle at top right,rgba(21,115,107,.12),transparent 30%),linear-gradient(180deg,#fbf8f3 0%,var(--canvas) 100%)}
-h1,h2,h3{font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",serif;letter-spacing:-.02em}
-.hero{padding:48px 0 30px;text-align:center;color:#fff;
-  background:radial-gradient(circle at 15% 15%,rgba(255,255,255,.16),transparent 20%),radial-gradient(circle at 85% 18%,rgba(255,255,255,.12),transparent 20%),linear-gradient(135deg,#0c2f37 0%,#13525a 36%,#15736b 100%)}
-.hero h1{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;margin-bottom:6px}
-.hero .author{font-size:.78rem;opacity:.5;margin-top:4px}
-.container{width:min(960px,calc(100% - 40px));margin:0 auto;padding:24px 0 64px}
-.card{background:var(--card);border:1px solid rgba(24,51,63,.08);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-bottom:20px;position:relative;overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--primary-deep),var(--primary),var(--accent));border-radius:var(--radius) var(--radius) 0 0}
-.card-title{font-size:1.1rem;font-weight:600;color:var(--primary-deep);margin-bottom:16px}
-.card-kicker{display:block;font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-light);margin-bottom:4px}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
-label{display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-light);margin-bottom:6px}
-input[type=number],input[type=text],select{width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;font-size:.96rem;background:#fbfcfb;color:var(--text);outline:none;transition:all .2s}
-input:focus,select:focus{border-color:rgba(21,115,107,.55);box-shadow:0 0 0 4px rgba(21,115,107,.12);transform:translateY(-1px)}
-.radio-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
-.radio-group label{font-weight:600;font-size:.92rem;color:var(--text);display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:0;padding:10px 16px;border-radius:999px;border:1px solid var(--border);background:var(--surface);text-transform:none;letter-spacing:0;transition:.2s}
-.radio-group label:has(input:checked){background:var(--primary-deep);color:#fff;border-color:var(--primary-deep);box-shadow:0 10px 24px rgba(13,63,61,.18)}
-.radio-group input[type=radio]{display:none}
-.hint{font-size:.75rem;color:var(--text-light);margin-top:3px;font-weight:400;text-transform:none;letter-spacing:0}
-.btn-primary{background:linear-gradient(135deg,var(--primary-deep),var(--primary));color:#fff;border:none;padding:14px 28px;font-size:.95rem;font-weight:700;border-radius:999px;cursor:pointer;width:100%;margin-top:12px;box-shadow:0 14px 28px rgba(13,63,61,.22);transition:all .2s}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 18px 36px rgba(13,63,61,.28)}
-.btn-secondary{background:rgba(255,255,255,.76);color:var(--primary-deep);border:1px solid rgba(21,115,107,.18);padding:12px 24px;font-size:.9rem;font-weight:700;border-radius:999px;cursor:pointer;transition:all .2s}
-.btn-secondary:hover{background:var(--primary-light);border-color:var(--primary)}
-/* Presets */
-.presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-.preset-btn{padding:8px 16px;border:1px solid var(--border);border-radius:999px;font-size:.82rem;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);transition:all .2s}
-.preset-btn:hover{border-color:var(--primary);color:var(--primary-deep);background:var(--primary-light);box-shadow:0 4px 12px rgba(21,115,107,.1)}
-/* Verdict */
-.verdict-banner{border-radius:var(--radius);padding:24px 28px;margin-bottom:20px;border-width:2px;border-style:solid;box-shadow:var(--shadow)}
-.verdict-class{font-size:clamp(1.4rem,3vw,1.8rem);font-weight:700;letter-spacing:-.01em}
-.verdict-study{font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.95rem;font-weight:500;margin:6px 0 8px;opacity:.85}
-.verdict-tagline{font-family:"Avenir Next","Segoe UI",sans-serif;font-size:.88rem;opacity:.75;line-height:1.5}
-.verdict-POSITIVE{background:#f0fdf4;border-color:#86efac;color:#14532d}
-.verdict-IMPRECISE_POSITIVE{background:#eff6ff;border-color:#93c5fd;color:#1e3a8a}
-.verdict-NEUTRAL{background:#f9fafb;border-color:#d1d5db;color:#374151}
-.verdict-NEGATIVE{background:#fffbeb;border-color:#fcd34d;color:#7c2d12}
-.verdict-INCONCLUSIVE_UNDERPOWERED{background:#fefce8;border-color:#fde68a;color:#713f12}
-.verdict-HARMFUL{background:#fef2f2;border-color:#fca5a5;color:#7f1d1d}
-.verdict-IMPRECISE_HARMFUL{background:#fff7f0;border-color:#fdba74;color:#7c2d12}
-/* Steps */
-.steps-list{list-style:none;margin:0}
-.step-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f3f2ed}
-.step-item:last-child{border-bottom:none}
-.step-num{min-width:26px;height:26px;border-radius:50%;background:var(--primary-light);color:var(--primary-deep);font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.step-text{font-size:.88rem;color:var(--text);padding-top:3px}
-.step-verdict{font-weight:600;color:var(--primary)}
-/* Table */
-.table-wrap{overflow:auto;border-radius:20px;border:1px solid rgba(24,51,63,.08);background:var(--surface-alt)}
-.bayes-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.bayes-table th{background:var(--primary-deep);color:#fff;padding:14px 10px;text-align:center;font-weight:700;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
-.bayes-table td{padding:12px 10px;text-align:center;border-bottom:1px solid rgba(24,51,63,.08)}
-.bayes-table tr:nth-child(even){background:#f8fbfa}
-.bayes-table tr:hover{background:var(--primary-light)}
-.bayes-table tr:last-child td{border-bottom:none}
-.cell-green{background:#f0fdf4;color:#14532d;font-weight:600}
-.cell-yellow{background:#fefce8;color:#713f12;font-weight:600}
-.cell-orange{background:#fff7ed;color:#7c2d12;font-weight:600}
-.cell-red{background:#fef2f2;color:#7f1d1d;font-weight:600}
-/* Fingerprint */
-.fingerprint{margin-top:16px;padding:14px 18px;background:#f0f9f8;border:1px solid #cce8e5;border-radius:8px;font-size:.88rem}
-.fingerprint strong{color:var(--primary-deep)}
-.fp-match{display:inline-block;padding:3px 12px;border-radius:12px;font-size:.8rem;font-weight:600;margin-left:6px}
-/* Narrative */
-.narrative{font-size:.9rem;line-height:1.7;color:var(--text);background:var(--primary-soft);border:1px solid rgba(21,115,107,.12);border-left:4px solid var(--primary);padding:16px 20px;border-radius:0 18px 18px 0;margin-top:14px}
-.narrative strong{color:var(--primary-deep)}
-/* Download */
-.download-row{display:flex;justify-content:center;padding:8px 0 4px}
-#ciForestPlot,#posteriorDensityPlot,#cdfPlot,#forestPlot{width:100%;min-height:10px}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(197, 109, 55, 0.10), transparent 26%),
+    radial-gradient(circle at top right, rgba(21, 115, 107, 0.12), transparent 30%),
+    linear-gradient(180deg, #fbf8f3 0%, var(--paper) 100%);
+  color: var(--ink);
+  line-height: 1.6;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(18, 37, 49, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 37, 49, 0.03) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.15), transparent 78%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+h1, h2, h3, h4 {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  letter-spacing: -0.02em;
+}
+
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; }
+
+.container {
+  width: min(1220px, calc(100% - 36px));
+  margin: 0 auto;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  color: white;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(233, 142, 61, 0.24), transparent 18%),
+    radial-gradient(circle at 86% 20%, rgba(233, 142, 61, 0.18), transparent 20%),
+    linear-gradient(135deg, #081427 0%, #0f233f 44%, #172f4c 100%);
+  padding: 52px 0 34px;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  right: -110px;
+  bottom: -170px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 28px;
+  align-items: end;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+.hero h1 {
+  font-size: clamp(2.7rem, 5vw, 4.8rem);
+  line-height: 0.95;
+  margin-bottom: 10px;
+}
+.author-line {
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 16px;
+}
+.hero-copy p {
+  max-width: 60ch;
+  font-size: 1.02rem;
+  color: rgba(255, 255, 255, 0.84);
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.hero-badge {
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.83rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+.hero-panel {
+  position: relative;
+  z-index: 1;
+  background: rgba(14, 25, 33, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  padding: 24px 26px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+}
+.hero-panel h3 {
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+}
+.hero-panel p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.94rem;
+}
+.hero-quote {
+  margin: 16px 0 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.hero-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.hero-stat {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+.hero-stat strong {
+  display: block;
+  font-size: 1.2rem;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.hero-stat span {
+  display: block;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: 0.2s ease;
+}
+.btn-primary {
+  border: none;
+  color: white;
+  background: linear-gradient(135deg, var(--orange-600), #d98a3c);
+  box-shadow: 0 14px 32px rgba(197, 109, 55, 0.28);
+}
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.14); }
+
+.main-shell {
+  padding: 28px 0 64px;
+}
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.card {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  padding: 28px;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--teal-900), var(--teal-700), var(--orange-600));
+}
+.section-label {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+.card-title {
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  margin-bottom: 10px;
+  color: var(--teal-900);
+}
+.overview-card p {
+  max-width: 64ch;
+  color: var(--muted);
+}
+.rule-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.rule-pill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.mini-steps {
+  display: grid;
+  gap: 14px;
+}
+.mini-step {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.mini-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--teal-900);
+  color: white;
+  font-weight: 700;
+}
+.mini-step h3 {
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+}
+.mini-step p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.control-card {
+  position: sticky;
+  top: 18px;
+}
+.result-column {
+  display: grid;
+  gap: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.form-stack {
+  display: grid;
+  gap: 14px;
+}
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+input[type="number"],
+input[type="text"] {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  transition: 0.2s ease;
+}
+input:focus {
+  outline: none;
+  border-color: rgba(21, 115, 107, 0.45);
+  box-shadow: 0 0 0 4px rgba(21, 115, 107, 0.10);
+}
+.hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.radio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+.radio-chip input { display: none; }
+.radio-chip.active {
+  background: var(--teal-900);
+  border-color: var(--teal-900);
+  color: white;
+  box-shadow: 0 10px 24px rgba(13, 55, 65, 0.18);
+}
+.error {
+  display: none;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fef2f2;
+  border: 1px solid rgba(181, 58, 49, 0.16);
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
+.classes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.class-chip {
+  padding: 14px 14px 16px;
+  border-radius: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  min-height: 138px;
+}
+.class-chip strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+.class-chip p {
+  font-size: 0.83rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.results-stack {
+  display: grid;
+  gap: 20px;
+}
+.results-subgrid {
+  display: grid;
+  gap: 20px;
+}
+.verdict-banner {
+  border-radius: var(--radius-xl);
+  padding: 26px 28px;
+  border: 2px solid transparent;
+  box-shadow: var(--shadow);
+}
+.verdict-banner h2 {
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  margin-bottom: 8px;
+}
+.verdict-banner p {
+  max-width: 64ch;
+  font-size: 0.95rem;
+}
+.verdict-banner .study-line {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  opacity: 0.82;
+}
+.verdict-POSITIVE { background: #eefbf5; border-color: #7fd3a9; color: #13523a; }
+.verdict-IMPRECISE_POSITIVE { background: #eef5ff; border-color: #89b6ff; color: #1f4c95; }
+.verdict-NEUTRAL { background: #f7f8fa; border-color: #ced4dc; color: #39414f; }
+.verdict-NEGATIVE { background: #fff8ea; border-color: #f2c66b; color: #7a4f08; }
+.verdict-INCONCLUSIVE_UNDERPOWERED { background: #fffde9; border-color: #ead26c; color: #725200; }
+.verdict-HARMFUL { background: #fef0ef; border-color: #f0a19b; color: #84231e; }
+.verdict-IMPRECISE_HARMFUL { background: #fff5ef; border-color: #f0b089; color: #8a3a17; }
+
+.result-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: 20px;
+}
+.metric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.metric-chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: white;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+.steps-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+.step-item {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--teal-100);
+  color: var(--teal-900);
+  font-weight: 700;
+}
+.step-body {
+  padding-top: 3px;
+  font-size: 0.92rem;
+}
+.reporting-box {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #f6fbfa;
+  border: 1px solid rgba(21, 115, 107, 0.14);
+}
+.reporting-box strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--teal-900);
+}
+.reporting-box em {
+  color: var(--ink);
+  font-style: normal;
+}
+.prior-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface-strong);
+}
+.prior-table th {
+  background: #0f233f;
+  color: white;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 12px 12px;
+}
+.prior-table td {
+  padding: 12px 12px;
+  border-top: 1px solid rgba(18, 37, 49, 0.08);
+  font-size: 0.85rem;
+  vertical-align: top;
+}
+.prior-table tr:nth-child(even) td {
+  background: rgba(248, 244, 237, 0.72);
+}
+.prior-badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(233, 142, 61, 0.12);
+  color: #8a4a17;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.prior-note {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: #f9f5ef;
+  border: 1px solid rgba(197, 109, 55, 0.14);
+}
+.prior-note strong {
+  color: #7e4618;
+}
+
+.card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.text-link {
+  color: var(--teal-700);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.figure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.figure-card {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.figure-card img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  background: white;
+}
+.figure-copy {
+  padding: 16px;
+}
+.figure-copy h3 {
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+.figure-copy p {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.action-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(21, 115, 107, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--teal-900);
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+.btn-secondary:hover {
+  background: var(--teal-100);
+  border-color: rgba(21, 115, 107, 0.35);
+}
+
+.framework-section {
+  margin-top: 28px;
+}
+.framework-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+.framework-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.framework-card img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  background: white;
+}
+.framework-copy {
+  padding: 18px 20px 22px;
+}
+.framework-copy h3 {
+  font-size: 1.16rem;
+  margin-bottom: 8px;
+}
+.framework-copy p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.footer {
+  padding: 26px 0 44px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 1100px) {
+  .hero-grid,
+  .overview-grid,
+  .workspace,
+  .result-grid,
+  .framework-grid {
+    grid-template-columns: 1fr;
+  }
+  .control-card { position: static; }
+  .classes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .container { width: min(100% - 24px, 1220px); }
+  .hero { padding: 40px 0 28px; }
+  .card, .hero-panel { padding: 22px; }
+  .form-grid, .figure-grid, .classes-grid, .hero-stat-grid { grid-template-columns: 1fr; }
+  .hero-actions, .rule-pill-row, .metric-chips, .radio-group { width: 100%; }
+  .btn, .btn-secondary { width: 100%; }
+}
 </style>
 </head>
 <body>
 
-<div class="hero">
-  <h1>RCT Verdict Classifier</h1>
-  <div class="author">Prof. Ibrahim Halil Tanboga, MD, PhD — Nisantasi University Medical School</div>
-</div>
-
-<div class="container">
-
-<!-- INPUT -->
-<div class="card" id="inputCard">
-  <span class="card-kicker">Data Entry</span>
-  <h2 class="card-title">Trial Input</h2>
-
-  <div class="presets" id="presetBar" style="margin-bottom:14px"></div>
-
-  <div class="form-grid" style="margin-bottom:14px">
-    <div>
-      <label>Study Name (optional)</label>
-      <input type="text" id="studyName" placeholder="e.g. ANDROMEDA-SHOCK">
-    </div>
-    <div>
-      <label>Effect Measure</label>
-      <div class="radio-group" style="margin-top:8px">
-        <label><input type="radio" name="measure" value="HR" checked> HR</label>
-        <label><input type="radio" name="measure" value="RR"> RR</label>
-        <label><input type="radio" name="measure" value="OR"> OR</label>
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <div class="eyebrow">RCT interpretation tool</div>
+      <h1>RCT Verdict Classifier</h1>
+      <div class="author-line">Prof. Ibrahim Halil Tanboga, MD, PhD - Nisantasi University Medical School</div>
+      <p>
+        A cleaner way to read randomized trials: inspect the confidence interval, compare it with the null and MCID thresholds, and decide whether the result is positive, imprecise, neutral, negative, inconclusive, or harmful.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#workspace">Launch classifier</a>
+        <a class="btn btn-ghost" href="#framework">See framework</a>
+      </div>
+      <div class="hero-badges">
+        <span class="hero-badge">6 core verdicts</span>
+        <span class="hero-badge">CI and MCID first</span>
+        <span class="hero-badge">Runs entirely in the browser</span>
       </div>
     </div>
+    <aside class="hero-panel">
+      <h3>Interpretation, not ritual</h3>
+      <p>Most trial abstracts collapse very different signals into one phrase: "no significant difference."</p>
+      <div class="hero-quote">p &gt; 0.05 is not a verdict.</div>
+      <div class="hero-stat-grid">
+        <div class="hero-stat">
+          <strong>1</strong>
+          <span>Does the CI exclude the null?</span>
+        </div>
+        <div class="hero-stat">
+          <strong>2</strong>
+          <span>Does it clear the MCID for benefit?</span>
+        </div>
+        <div class="hero-stat">
+          <strong>3</strong>
+          <span>Is meaningful harm excluded?</span>
+        </div>
+      </div>
+    </aside>
   </div>
+</section>
 
-  <div style="margin-bottom:14px">
-    <label>Input Method</label>
-    <div class="radio-group" style="margin-top:6px">
-      <label><input type="radio" name="inputMethod" value="ratio" checked onchange="toggleInputMethod()"> Effect + 95% CI</label>
-      <label><input type="radio" name="inputMethod" value="counts" onchange="toggleInputMethod()"> Event Counts (OR)</label>
-    </div>
-  </div>
+<main class="container main-shell">
+  <section class="overview-grid">
+    <article class="card overview-card">
+      <span class="section-label">Core rule</span>
+      <h2 class="card-title">Read the interval, then ask what it excludes.</h2>
+      <p>
+        This interface is deliberately centered on CI + MCID logic. It is built to separate truly neutral results from merely negative ones, and to stop underpowered trials from being mislabeled as definitive.
+      </p>
+      <div class="rule-pill-row">
+        <span class="rule-pill">Positive: CI entirely beyond MCID-benefit</span>
+        <span class="rule-pill">Neutral: benefit and harm both excluded</span>
+        <span class="rule-pill">Inconclusive: clinically important benefit or harm still possible</span>
+      </div>
+    </article>
+    <article class="card">
+      <span class="section-label">Three-step workflow</span>
+      <div class="mini-steps">
+        <div class="mini-step">
+          <div class="mini-step-index">1</div>
+          <div>
+            <h3>Enter the trial estimate</h3>
+            <p>Use the reported ratio and 95% CI, or derive an odds ratio from 2x2 event counts.</p>
+          </div>
+        </div>
+        <div class="mini-step">
+          <div class="mini-step-index">2</div>
+          <div>
+            <h3>Set benefit and harm thresholds</h3>
+            <p>Define what counts as clinically important, not just statistically non-null.</p>
+          </div>
+        </div>
+        <div class="mini-step">
+          <div class="mini-step-index">3</div>
+          <div>
+            <h3>Classify the signal</h3>
+            <p>The app explains why the result is positive, imprecise, neutral, negative, inconclusive, or harmful.</p>
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
 
-  <div id="ratioInputs">
-    <div class="form-grid">
-      <div><label>Effect Size</label><input type="number" id="effectSize" step="0.01" placeholder="e.g. 0.76"></div>
-      <div></div>
-      <div><label>95% CI — Lower</label><input type="number" id="ciLower" step="0.01" placeholder="e.g. 0.60"></div>
-      <div><label>95% CI — Upper</label><input type="number" id="ciUpper" step="0.01" placeholder="e.g. 0.97"></div>
-    </div>
-  </div>
+  <section class="workspace" id="workspace">
+    <aside class="card control-card">
+      <span class="section-label">Analysis workspace</span>
+      <h2 class="card-title">Trial input</h2>
 
-  <div id="countInputs" style="display:none">
-    <div class="form-grid">
-      <div><label>Events — Treatment</label><input type="number" id="eventsTx" step="1"></div>
-      <div><label>Total N — Treatment</label><input type="number" id="totalTx" step="1"></div>
-      <div><label>Events — Control</label><input type="number" id="eventsCtrl" step="1"></div>
-      <div><label>Total N — Control</label><input type="number" id="totalCtrl" step="1"></div>
-    </div>
-  </div>
+      <div class="form-stack">
+        <div class="form-grid">
+          <div>
+            <label for="studyName">Study name</label>
+            <input type="text" id="studyName" placeholder="e.g. ANDROMEDA-SHOCK">
+          </div>
+          <div>
+            <label>Effect measure</label>
+            <div class="radio-group" data-group="measure">
+              <label class="radio-chip active"><input type="radio" name="measure" value="HR" checked>HR</label>
+              <label class="radio-chip"><input type="radio" name="measure" value="RR">RR</label>
+              <label class="radio-chip"><input type="radio" name="measure" value="OR">OR</label>
+            </div>
+          </div>
+        </div>
 
-  <div class="form-grid" style="margin-top:14px">
-    <div>
-      <label>MCID — Benefit (δ)</label>
-      <input type="number" id="mcidBenefit" step="0.01" value="0.80">
-      <div class="hint">e.g. 0.80 = ≥20% relative risk reduction</div>
-    </div>
-    <div>
-      <label>MCID — Harm</label>
-      <input type="number" id="mcidHarm" step="0.01" value="1.25">
-      <div class="hint">e.g. 1.25 = ≥25% relative risk increase</div>
-    </div>
-    <div>
-      <label>Expected Effect (Optimistic Prior)</label>
-      <input type="number" id="expectedEffect" step="0.01" placeholder="Default = MCID-benefit">
-    </div>
-    <div>
-      <label>p-value (optional, display only)</label>
-      <input type="number" id="pValue" step="0.001" placeholder="e.g. 0.06">
-    </div>
-  </div>
+        <div>
+          <label>Input method</label>
+          <div class="radio-group" data-group="inputMethod">
+            <label class="radio-chip active"><input type="radio" name="inputMethod" value="ratio" checked onchange="toggleInputMethod()">Effect + 95% CI</label>
+            <label class="radio-chip"><input type="radio" name="inputMethod" value="counts" onchange="toggleInputMethod()">Event counts</label>
+          </div>
+        </div>
 
-  <button class="btn-primary" onclick="runClassifier()">Classify Trial →</button>
-  <div id="inputError" style="color:#dc2626;font-size:.85rem;margin-top:8px;display:none"></div>
-</div>
+        <div id="ratioInputs">
+          <div class="form-grid">
+            <div>
+              <label for="effectSize">Effect size</label>
+              <input type="number" id="effectSize" step="0.01" placeholder="0.76">
+            </div>
+            <div></div>
+            <div>
+              <label for="ciLower">95% CI - lower</label>
+              <input type="number" id="ciLower" step="0.01" placeholder="0.60">
+            </div>
+            <div>
+              <label for="ciUpper">95% CI - upper</label>
+              <input type="number" id="ciUpper" step="0.01" placeholder="0.97">
+            </div>
+          </div>
+        </div>
 
-<!-- RESULTS -->
-<div id="resultsSection" style="display:none">
-  <div id="verdictBanner"></div>
-  <div class="card">
-    <span class="card-kicker">Frequentist Track</span>
-    <h2 class="card-title">CI + MCID Classification</h2>
-    <div id="ciForestPlot"></div>
-    <div id="freqReasoning" style="margin-top:16px"></div>
+        <div id="countInputs" style="display:none">
+          <div class="form-grid">
+            <div>
+              <label for="eventsTx">Events - treatment</label>
+              <input type="number" id="eventsTx" step="1">
+            </div>
+            <div>
+              <label for="totalTx">Total N - treatment</label>
+              <input type="number" id="totalTx" step="1">
+            </div>
+            <div>
+              <label for="eventsCtrl">Events - control</label>
+              <input type="number" id="eventsCtrl" step="1">
+            </div>
+            <div>
+              <label for="totalCtrl">Total N - control</label>
+              <input type="number" id="totalCtrl" step="1">
+            </div>
+          </div>
+          <div class="hint">2x2 table input derives an odds ratio. If any cell is zero, the app applies a 0.5 continuity correction.</div>
+        </div>
+
+        <div class="form-grid">
+          <div>
+            <label for="mcidBenefit">MCID - benefit</label>
+            <input type="number" id="mcidBenefit" step="0.01" value="0.80">
+            <div class="hint">Example: 0.80 means at least 20% relative reduction.</div>
+          </div>
+          <div>
+            <label for="mcidHarm">MCID - harm</label>
+            <input type="number" id="mcidHarm" step="0.01" value="1.25">
+            <div class="hint">Example: 1.25 means at least 25% relative increase.</div>
+          </div>
+          <div>
+            <label for="pValue">p-value (optional)</label>
+            <input type="number" id="pValue" step="0.001" placeholder="0.06">
+          </div>
+          <div>
+            <label>Interpretation lens</label>
+            <div class="hint" style="margin-top: 14px">The classifier uses CI position relative to the null and both MCID thresholds.</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%; margin-top:18px; border:none;" onclick="runClassifier()">Classify trial</button>
+      <div id="inputError" class="error"></div>
+    </aside>
+
+    <div class="result-column">
+      <article class="card">
+        <span class="section-label">Six verdicts</span>
+        <h2 class="card-title">What the labels mean</h2>
+        <div class="classes-grid">
+          <div class="class-chip">
+            <strong style="color:#17775d">Positive</strong>
+            <p>CI excludes the null and clears the benefit threshold across its full range.</p>
+          </div>
+          <div class="class-chip">
+            <strong style="color:#2563eb">Imprecise (+)</strong>
+            <p>Benefit is statistically significant, but the CI still crosses the MCID for magnitude.</p>
+          </div>
+          <div class="class-chip">
+            <strong style="color:#6a7280">Neutral</strong>
+            <p>Both clinically meaningful benefit and clinically meaningful harm are excluded.</p>
+          </div>
+          <div class="class-chip">
+            <strong style="color:#9a6a17">Negative</strong>
+            <p>Clinically important benefit is excluded, but the interval still leaves open a relevant downside.</p>
+          </div>
+          <div class="class-chip">
+            <strong style="color:#a37a00">Inconclusive</strong>
+            <p>The CI is too wide; clinically important benefit or harm remains plausible.</p>
+          </div>
+          <div class="class-chip">
+            <strong style="color:#b53a31">Harmful</strong>
+            <p>The whole interval is on the harm side, beyond the clinically important harm threshold.</p>
+          </div>
+        </div>
+      </article>
+
+      <section id="resultsSection" class="results-stack" hidden>
+        <div id="verdictBanner"></div>
+
+        <div class="results-subgrid">
+          <div class="result-grid">
+            <article class="card">
+              <span class="section-label">Confidence interval</span>
+              <h2 class="card-title">Visual classification</h2>
+              <div id="ciPlot"></div>
+              <div id="metricChips" class="metric-chips"></div>
+            </article>
+
+            <article class="card">
+              <span class="section-label">Reasoning</span>
+              <h2 class="card-title">Step-by-step interpretation</h2>
+              <div id="freqReasoning"></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <span class="section-label">Prior sensitivity</span>
+            <h2 class="card-title">Posterior probability table</h2>
+            <div id="priorSensitivity"></div>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <span class="section-label">Teaching figures</span>
+              <h2 class="card-title">Context for this verdict</h2>
+            </div>
+            <a class="text-link" href="#framework">See full framework</a>
+          </div>
+          <div id="figureGallery" class="figure-grid"></div>
+        </article>
+
+        <div class="action-row">
+          <button class="btn-secondary" onclick="downloadReport()">Download summary (HTML)</button>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="framework-section" id="framework">
+    <span class="section-label">Framework</span>
+    <h2 class="card-title" style="margin-bottom: 0">Three mistakes this tool is built to prevent</h2>
+    <div class="framework-grid">
+      <article class="framework-card">
+        <img src="figures/ci_mcid_decision_algorithm.svg" alt="CI and MCID decision algorithm">
+        <div class="framework-copy">
+          <h3>1. Mistaking significance for interpretation</h3>
+          <p>First ask whether the null is excluded, then ask whether the interval clears the MCID for benefit or harm. Statistical significance alone is not the endpoint.</p>
+        </div>
+      </article>
+      <article class="framework-card">
+        <img src="figures/p_nonsig_three_scenarios_english.svg" alt="Three different meanings of non-significant results">
+        <div class="framework-copy">
+          <h3>2. Treating all p &gt; 0.05 results as the same</h3>
+          <p>Non-significant trials can still be neutral, negative, or inconclusive. Those are not interchangeable statements.</p>
+        </div>
+      </article>
+      <article class="framework-card">
+        <img src="figures/negative_vs_neutral_comparison.svg" alt="Negative versus neutral comparison">
+        <div class="framework-copy">
+          <h3>3. Collapsing negative and neutral into one bucket</h3>
+          <p>Negative means meaningful benefit is excluded. Neutral is stronger: both meaningful benefit and meaningful harm are excluded.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    RCT Verdict Classifier - static browser app for CI + MCID interpretation. Core references include Pocock &amp; Stone (NEJM 2016), Hawkins &amp; Samuels (JAMA 2021), Altman &amp; Bland (BMJ 1995), and the accompanying interpretation note used as the conceptual source for this revision.
   </div>
-  <div class="card">
-    <span class="card-kicker">Bayesian Track</span>
-    <h2 class="card-title">Posterior Analysis</h2>
-    <div id="posteriorDensityPlot"></div>
-    <div id="cdfPlot" style="margin-top:12px"></div>
-    <div id="forestPlot" style="margin-top:12px"></div>
-    <div id="bayesTableContainer" class="table-wrap" style="margin-top:16px"></div>
-    <div id="bayesFingerprint"></div>
-    <div id="bayesNarrative"></div>
-  </div>
-  <div class="download-row">
-    <button class="btn-secondary" onclick="downloadReport()">Download Full Report (HTML)</button>
-  </div>
-</div>
-</div>
+</footer>
 
 <script>
-// ============================================================
-// MATH
-// ============================================================
-function erf(x){const a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911;const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+p*x);return s*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));}
-function normalCDF(x,m=0,s=1){return .5*(1+erf((x-m)/(s*Math.SQRT2)));}
-function normalPDF(x,m=0,s=1){return Math.exp(-.5*((x-m)/s)**2)/(s*Math.sqrt(2*Math.PI));}
-function normalQuantile(p,m=0,s=1){if(p<=0)return-Infinity;if(p>=1)return Infinity;const q=p<.5?p:1-p,t=Math.sqrt(-2*Math.log(q));let z=t-(2.515517+.802853*t+.010328*t*t)/(1+1.432788*t+.189269*t*t+.001308*t*t*t);if(p<.5)z=-z;return m+s*z;}
-function conjUpdate(pm,ps,dm,ds){const pp=1/(ps*ps),dp=1/(ds*ds),tp=pp+dp,tv=1/tp;return{mean:tv*(pm*pp+dm*dp),sd:Math.sqrt(tv)};}
-function priorSD(pm,tail){if(Math.abs(pm)<.001)return .355;return Math.abs(pm)/Math.abs(normalQuantile(tail));}
-
-// ROPE boundaries (±10%, Kruschke 2018 / Zampieri AJRCCM 2021)
-const ROPE_L=Math.log(1/1.1), ROPE_U=Math.log(1.1); // log scale
-const ROPE_L_R=1/1.1, ROPE_U_R=1.1; // ratio scale
-
-// ============================================================
-// PRESETS
-// ============================================================
-const PRESETS=[
-  {name:'DAPA-HF',cls:'Positive',m:'HR',e:0.74,lo:0.65,hi:0.85,p:.001,mb:0.80,mh:1.25},
-  {name:'EOLIA',cls:'Imprecise(+)',m:'RR',e:0.76,lo:0.55,hi:1.04,p:.09,mb:0.80,mh:1.25},
-  {name:'ISCHEMIA (death)',cls:'Neutral',m:'HR',e:1.05,lo:0.83,hi:1.32,p:null,mb:0.80,mh:1.25},
-  {name:'ORBITA (HR proxy)',cls:'Negative',m:'HR',e:0.95,lo:0.85,hi:1.07,p:.20,mb:0.80,mh:1.25},
-  {name:'TOPCAT',cls:'Inconclusive',m:'HR',e:0.89,lo:0.77,hi:1.04,p:.14,mb:0.80,mh:1.25},
-  {name:'ART',cls:'Harmful',m:'OR',e:1.27,lo:0.99,hi:1.63,p:.057,mb:0.80,mh:1.25},
-  {name:'POST-PCI',cls:'Inconclusive',m:'HR',e:0.90,lo:0.61,hi:1.35,p:.62,mb:0.80,mh:1.25},
-];
-
-function loadPreset(idx){
-  const p=PRESETS[idx];
-  document.getElementById('studyName').value=p.name;
-  document.querySelector(`input[name="measure"][value="${p.m}"]`).checked=true;
-  document.querySelector('input[name="inputMethod"][value="ratio"]').checked=true;
-  toggleInputMethod();
-  document.getElementById('effectSize').value=p.e;
-  document.getElementById('ciLower').value=p.lo;
-  document.getElementById('ciUpper').value=p.hi;
-  document.getElementById('pValue').value=p.p||'';
-  document.getElementById('mcidBenefit').value=p.mb;
-  document.getElementById('mcidHarm').value=p.mh;
-  document.getElementById('expectedEffect').value='';
-}
-
-(function initPresets(){
-  const bar=document.getElementById('presetBar');
-  PRESETS.forEach((p,i)=>{
-    const b=document.createElement('button');
-    b.className='preset-btn';
-    b.textContent=p.name+' ('+p.cls+')';
-    b.onclick=()=>loadPreset(i);
-    bar.appendChild(b);
-  });
-})();
-
-// ============================================================
-// INPUT
-// ============================================================
-function toggleInputMethod(){
-  const m=document.querySelector('input[name="inputMethod"]:checked').value;
-  document.getElementById('ratioInputs').style.display=m==='ratio'?'':'none';
-  document.getElementById('countInputs').style.display=m==='counts'?'':'none';
-}
-
-function getInputs(){
-  const method=document.querySelector('input[name="inputMethod"]:checked').value;
-  const measure=document.querySelector('input[name="measure"]:checked').value;
-  const studyName=document.getElementById('studyName').value.trim();
-  const mcidBenefit=parseFloat(document.getElementById('mcidBenefit').value);
-  const mcidHarm=parseFloat(document.getElementById('mcidHarm').value);
-  if(isNaN(mcidBenefit)||isNaN(mcidHarm))return{error:'MCID values are required.'};
-  if(mcidBenefit>=1.0)return{error:'MCID-benefit must be < 1.0 (e.g. 0.80). For "lower is better" ratio measures.'};
-  if(mcidHarm<=1.0)return{error:'MCID-harm must be > 1.0 (e.g. 1.25).'};
-  const pRaw=document.getElementById('pValue').value;
-  const pValue=pRaw?parseFloat(pRaw):null;
-  const expRaw=document.getElementById('expectedEffect').value;
-  const expectedEffect=expRaw?parseFloat(expRaw):mcidBenefit;
-
-  let logEffect,se,observedRatio,ciLower,ciUpper;
-  if(method==='ratio'){
-    const eff=parseFloat(document.getElementById('effectSize').value);
-    const cL=parseFloat(document.getElementById('ciLower').value);
-    const cU=parseFloat(document.getElementById('ciUpper').value);
-    if(isNaN(eff)||isNaN(cL)||isNaN(cU)||eff<=0||cL<=0||cU<=0)return{error:'Enter valid positive numbers for effect and CI.'};
-    if(cL>=cU)return{error:'CI lower must be less than CI upper.'};
-    logEffect=Math.log(eff);se=(Math.log(cU)-Math.log(cL))/(2*1.96);
-    observedRatio=eff;ciLower=cL;ciUpper=cU;
-  }else{
-    let a=parseFloat(document.getElementById('eventsTx').value);
-    let b_=parseFloat(document.getElementById('totalTx').value)-a;
-    let c=parseFloat(document.getElementById('eventsCtrl').value);
-    let d=parseFloat(document.getElementById('totalCtrl').value)-c;
-    if([a,b_,c,d].some(isNaN))return{error:'Enter valid event counts.'};
-    if(a===0||b_===0||c===0||d===0){a+=.5;b_+=.5;c+=.5;d+=.5;}
-    const or_=(a*d)/(b_*c);
-    logEffect=Math.log(or_);se=Math.sqrt(1/a+1/b_+1/c+1/d);
-    observedRatio=or_;ciLower=Math.exp(logEffect-1.96*se);ciUpper=Math.exp(logEffect+1.96*se);
+const FIGURES = {
+  algorithm: {
+    src: "figures/ci_mcid_decision_algorithm.svg",
+    title: "Decision algorithm",
+    body: "Use the confidence interval and both MCID boundaries to separate signal from uncertainty."
+  },
+  sixScenarios: {
+    src: "figures/ci_mcid_classification_scenarios.svg",
+    title: "Six scenario map",
+    body: "A quick visual for how each class sits relative to the null and clinical thresholds."
+  },
+  threeFaces: {
+    src: "figures/p_nonsig_three_scenarios_english.svg",
+    title: "Three faces of p > 0.05",
+    body: "Non-significant can still mean inconclusive, negative, or neutral depending on interval width."
+  },
+  negVsNeutral: {
+    src: "figures/negative_vs_neutral_comparison.svg",
+    title: "Negative versus neutral",
+    body: "Negative excludes meaningful benefit. Neutral excludes both meaningful benefit and meaningful harm."
+  },
+  underpowered: {
+    src: "figures/underpowered_visual_explanation.svg",
+    title: "Why underpowered trials mislead",
+    body: "Wide intervals keep too many clinically important possibilities alive."
   }
-  return{logEffect,se,observedRatio,ciLower,ciUpper,mcidBenefit,mcidHarm,expectedEffect,measure,studyName,pValue};
-}
-
-// ============================================================
-// CLASSIFICATION  (ROPE-based Neutral vs Negative)
-// ============================================================
-const V={
-  POSITIVE:{label:'Positive',color:'#16a34a',tag:'CI entirely past MCID-benefit — both statistically and clinically significant benefit.'},
-  IMPRECISE_POSITIVE:{label:'Imprecise (+)',color:'#2563eb',tag:'Statistically significant but CI crosses MCID — magnitude uncertain. Winner\'s curse risk if underpowered.'},
-  NEUTRAL:{label:'Neutral',color:'#6b7280',tag:'Narrow CI within ROPE — no clinically meaningful difference. Treatments are essentially the same.'},
-  NEGATIVE:{label:'Negative',color:'#d97706',tag:'Clinically important benefit excluded. CI extends beyond ROPE — cannot confirm full equivalence.'},
-  INCONCLUSIVE_UNDERPOWERED:{label:'Inconclusive / Underpowered',color:'#ca8a04',tag:'Wide CI — trial underpowered. Neither benefit nor harm can be excluded. More data needed.'},
-  HARMFUL:{label:'Harmful',color:'#dc2626',tag:'CI entirely past MCID-harm — statistically and clinically significant harm.'},
-  IMPRECISE_HARMFUL:{label:'Imprecise (Harm)',color:'#ea580c',tag:'Significant harm signal but CI crosses MCID-harm — magnitude uncertain.'}
 };
 
-function classify(ciL,ciU,mcidB,mcidH){
-  const exNull=(ciU<1.0)||(ciL>1.0);
-  const R=[];
-
-  if(exNull){
-    R.push({n:1,t:`CI [${ciL.toFixed(3)}–${ciU.toFixed(3)}] excludes null (=1.0) → p < 0.05 equivalent.`});
-    if(ciU<1.0){
-      R.push({n:2,t:`Benefit direction: entire CI below 1.0.`});
-      if(ciU<=mcidB){
-        R.push({n:3,t:`CI upper (${ciU.toFixed(3)}) ≤ MCID-benefit (${mcidB}) → entire CI past clinically important threshold.`,v:true});
-        return{verdict:'POSITIVE',exNull,R};
-      }else{
-        R.push({n:3,t:`CI upper (${ciU.toFixed(3)}) > MCID-benefit (${mcidB}) → CI crosses MCID. Benefit significant but magnitude uncertain.`,v:true});
-        return{verdict:'IMPRECISE_POSITIVE',exNull,R};
-      }
-    }else{
-      R.push({n:2,t:`Harm direction: entire CI above 1.0.`});
-      if(ciL>=mcidH){
-        R.push({n:3,t:`CI lower (${ciL.toFixed(3)}) ≥ MCID-harm (${mcidH}) → entire CI in clinically significant harm zone.`,v:true});
-        return{verdict:'HARMFUL',exNull,R};
-      }else{
-        R.push({n:3,t:`CI lower (${ciL.toFixed(3)}) < MCID-harm (${mcidH}) → harm significant but magnitude uncertain.`,v:true});
-        return{verdict:'IMPRECISE_HARMFUL',exNull,R};
-      }
-    }
-  }else{
-    R.push({n:1,t:`CI [${ciL.toFixed(3)}–${ciU.toFixed(3)}] includes null (=1.0) → p ≥ 0.05.`});
-    const benExcl=ciL>mcidB;
-    R.push({n:2,t:`Benefit excluded? ${benExcl?'YES — ciLower ('+ciL.toFixed(3)+') > MCID-benefit ('+mcidB+')':'NO — ciLower ('+ciL.toFixed(3)+') ≤ MCID-benefit ('+mcidB+')'}`});
-
-    if(!benExcl){
-      R.push({n:3,t:`CI includes MCID-benefit zone — clinically meaningful benefit cannot be ruled out. Trial underpowered / inconclusive.`,v:true});
-      return{verdict:'INCONCLUSIVE_UNDERPOWERED',exNull,benExcl,R};
-    }
-
-    // Benefit excluded → Neutral or Negative? Use ROPE
-    const inROPE=ciL>=ROPE_L_R && ciU<=ROPE_U_R;
-    R.push({n:3,t:`ROPE check [${ROPE_L_R.toFixed(3)}–${ROPE_U_R.toFixed(3)}]: CI ${inROPE?'entirely WITHIN':'extends OUTSIDE'} ROPE.`});
-
-    if(inROPE){
-      R.push({n:4,t:`Benefit excluded + CI within ROPE → treatments are equivalent. Precise null.`,v:true});
-      return{verdict:'NEUTRAL',exNull,benExcl,inROPE,R};
-    }else{
-      R.push({n:4,t:`Benefit excluded but CI extends beyond ROPE → "doesn't work" but not proven equivalent. Harm direction uncertainty remains.`,v:true});
-      return{verdict:'NEGATIVE',exNull,benExcl,inROPE,R};
-    }
+const VERDICT_META = {
+  POSITIVE: {
+    label: "Positive",
+    className: "POSITIVE",
+    color: "#17775d",
+    tagline: "The entire interval sits beyond the MCID-benefit threshold. Benefit is both statistically and clinically convincing."
+  },
+  IMPRECISE_POSITIVE: {
+    label: "Imprecise (+)",
+    className: "IMPRECISE_POSITIVE",
+    color: "#2563eb",
+    tagline: "The result is statistically significant, but the interval still crosses the MCID for magnitude. Benefit is real; size is still uncertain."
+  },
+  NEUTRAL: {
+    label: "Neutral",
+    className: "NEUTRAL",
+    color: "#6a7280",
+    tagline: "Meaningful benefit and meaningful harm are both excluded. This is a precise null result."
+  },
+  NEGATIVE: {
+    label: "Negative",
+    className: "NEGATIVE",
+    color: "#9a6a17",
+    tagline: "Clinically important benefit is excluded, but the interval still leaves open a relevant downside."
+  },
+  INCONCLUSIVE_UNDERPOWERED: {
+    label: "Inconclusive / Underpowered",
+    className: "INCONCLUSIVE_UNDERPOWERED",
+    color: "#a37a00",
+    tagline: "The interval is too wide. Clinically important benefit or harm remains possible."
+  },
+  HARMFUL: {
+    label: "Harmful",
+    className: "HARMFUL",
+    color: "#b53a31",
+    tagline: "The whole interval sits beyond the MCID-harm threshold. Harm is both statistically and clinically important."
+  },
+  IMPRECISE_HARMFUL: {
+    label: "Imprecise harm signal",
+    className: "IMPRECISE_HARMFUL",
+    color: "#c56d37",
+    tagline: "The result is statistically harmful, but the interval still crosses the MCID-harm threshold. Direction is harmful; magnitude remains uncertain."
   }
+};
+
+function formatPValue(pValue) {
+  if (pValue === null || Number.isNaN(pValue)) return "p from CI";
+  return pValue < 0.001 ? "p < 0.001" : `p = ${pValue.toFixed(3)}`;
 }
 
-// ============================================================
-// BAYESIAN
-// ============================================================
-function buildPriors(expEff,mcidB,mcidH){
-  const lE=Math.log(expEff),lH=Math.log(mcidH);
-  return[
-    {name:'Skeptical',mean:0,sd:.355,color:'#15736b',desc:'N(0, 0.355²) — no expected effect'},
-    {name:'Optimistic',mean:lE,sd:priorSD(lE,.15),color:'#17775d',desc:`Centered at ${expEff}; Pr(harm)≈15%`},
-    {name:'Pessimistic',mean:lH,sd:priorSD(lH,.15),color:'#c5673a',desc:`Centered at ${mcidH}; Pr(benefit)≈15%`}
+function erf(x) {
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const t = 1 / (1 + (p * absX));
+  const y = 1 - (((((a5 * t) + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
+  return sign * y;
+}
+
+function normalCDF(x, mean = 0, sd = 1) {
+  return 0.5 * (1 + erf((x - mean) / (sd * Math.SQRT2)));
+}
+
+function normalQuantile(probability, mean = 0, sd = 1) {
+  if (probability <= 0) return -Infinity;
+  if (probability >= 1) return Infinity;
+  const q = probability < 0.5 ? probability : 1 - probability;
+  const t = Math.sqrt(-2 * Math.log(q));
+  let z = t - (2.515517 + (0.802853 * t) + (0.010328 * t * t)) / (1 + (1.432788 * t) + (0.189269 * t * t) + (0.001308 * t * t * t));
+  if (probability < 0.5) z = -z;
+  return mean + (sd * z);
+}
+
+function conjugateUpdate(priorMean, priorSd, dataMean, dataSd) {
+  const priorPrecision = 1 / (priorSd * priorSd);
+  const dataPrecision = 1 / (dataSd * dataSd);
+  const totalPrecision = priorPrecision + dataPrecision;
+  const variance = 1 / totalPrecision;
+  return {
+    mean: variance * ((priorMean * priorPrecision) + (dataMean * dataPrecision)),
+    sd: Math.sqrt(variance)
+  };
+}
+
+function priorSdForTail(mean, tailProbability) {
+  return Math.abs(mean) / Math.abs(normalQuantile(tailProbability));
+}
+
+function buildPriorSet(mcidBenefit, mcidHarm) {
+  const optimisticMean = Math.log(mcidBenefit);
+  const pessimisticMean = Math.log(mcidHarm);
+  return [
+    { name: "Flat", mean: 0, sd: 1.00, rationale: "Diffuse prior centered on no effect" },
+    { name: "Weak skeptical", mean: 0, sd: 0.70, rationale: "Light shrinkage toward the null" },
+    { name: "Moderate skeptical", mean: 0, sd: 0.35, rationale: "Default null-centered skeptical prior" },
+    { name: "Strong skeptical", mean: 0, sd: 0.20, rationale: "Aggressive shrinkage toward no effect" },
+    { name: "Moderate optimistic", mean: optimisticMean, sd: priorSdForTail(optimisticMean, 0.20), rationale: "Centered on the benefit MCID with moderate dispersion" },
+    { name: "Moderate pessimistic", mean: pessimisticMean, sd: priorSdForTail(pessimisticMean, 0.20), rationale: "Centered on the harm MCID with moderate dispersion" }
   ];
 }
 
-function bayesAnalysis(logE,se,priors,mcidB,mcidH){
-  return priors.map(p=>{
-    const post=conjUpdate(p.mean,p.sd,logE,se);
-    return{...p,post,
-      postMedian:Math.exp(post.mean),
-      crIL:Math.exp(normalQuantile(.025,post.mean,post.sd)),
-      crIH:Math.exp(normalQuantile(.975,post.mean,post.sd)),
-      pBenefit:normalCDF(0,post.mean,post.sd),
-      pMCID:normalCDF(Math.log(mcidB),post.mean,post.sd),
-      pROPE:normalCDF(ROPE_U,post.mean,post.sd)-normalCDF(ROPE_L,post.mean,post.sd),
-      pHarm:1-normalCDF(0,post.mean,post.sd),
-      pSevereHarm:1-normalCDF(Math.log(mcidH),post.mean,post.sd)
+function posteriorSensitivity(logEffect, se, mcidBenefit, mcidHarm) {
+  return buildPriorSet(mcidBenefit, mcidHarm).map((prior) => {
+    const posterior = conjugateUpdate(prior.mean, prior.sd, logEffect, se);
+    return {
+      ...prior,
+      posteriorMedian: Math.exp(posterior.mean),
+      crILower: Math.exp(normalQuantile(0.025, posterior.mean, posterior.sd)),
+      crIUpper: Math.exp(normalQuantile(0.975, posterior.mean, posterior.sd)),
+      pBenefit: normalCDF(0, posterior.mean, posterior.sd),
+      pMCIDBenefit: normalCDF(Math.log(mcidBenefit), posterior.mean, posterior.sd),
+      pIndifference: normalCDF(Math.log(mcidHarm), posterior.mean, posterior.sd) - normalCDF(Math.log(mcidBenefit), posterior.mean, posterior.sd),
+      pMCIDHarm: 1 - normalCDF(Math.log(mcidHarm), posterior.mean, posterior.sd)
     };
   });
 }
 
-function calcI2(br){
-  const ms=br.map(r=>r.post.mean),vs=br.map(r=>r.post.sd**2),ws=vs.map(v=>1/v);
-  const W=ws.reduce((a,b)=>a+b,0),W2=ws.reduce((a,b)=>a+b*b,0);
-  const wM=ws.reduce((s,w,i)=>s+w*ms[i],0)/W;
-  const Q=ws.reduce((s,w,i)=>s+w*(ms[i]-wM)**2,0),df=br.length-1,C=W-W2/W;
-  const t2=Math.max(0,(Q-df)/C);
-  return{I2:Math.min(Math.round(t2>0?100*t2/(t2+(1/W)*df):0),100),t2};
+function syncRadioChips() {
+  document.querySelectorAll(".radio-group").forEach((group) => {
+    group.querySelectorAll(".radio-chip").forEach((chip) => {
+      const input = chip.querySelector("input");
+      chip.classList.toggle("active", input.checked);
+    });
+  });
 }
 
-// Bayesian fingerprint matching (Step 7 from framework)
-function bayesFingerprint(br){
-  const sk=br.find(r=>r.name==='Skeptical');
-  if(!sk)return{match:'unknown',confidence:'low'};
-  const p=sk;
-  if(p.pMCID>.80) return{match:'POSITIVE',confidence:p.pMCID>.90?'high':'moderate'};
-  if(p.pSevereHarm>.40) return{match:'HARMFUL',confidence:p.pSevereHarm>.60?'high':'moderate'};
-  if(p.pROPE>.90) return{match:'NEUTRAL',confidence:'high'};
-  if(p.pROPE>.80&&p.pMCID<.05) return{match:'NEGATIVE',confidence:'moderate'};
-  if(p.pBenefit>.90&&p.pMCID>=.40&&p.pMCID<=.70) return{match:'IMPRECISE_POSITIVE',confidence:'moderate'};
-  if(p.pMCID<.50&&p.pROPE<.50&&p.pHarm<.50) return{match:'INCONCLUSIVE_UNDERPOWERED',confidence:'low'};
-  return{match:'INCONCLUSIVE_UNDERPOWERED',confidence:'low'};
+document.addEventListener("change", (event) => {
+  if (event.target.matches('input[type="radio"]')) syncRadioChips();
+});
+
+function toggleInputMethod() {
+  const method = document.querySelector('input[name="inputMethod"]:checked').value;
+  document.getElementById("ratioInputs").style.display = method === "ratio" ? "" : "none";
+  document.getElementById("countInputs").style.display = method === "counts" ? "" : "none";
+  syncRadioChips();
 }
 
-// ============================================================
-// RENDER: CI Forest Plot
-// ============================================================
-function renderForest(data,verdict){
-  const{ciLower:cL,ciUpper:cU,observedRatio:eff,mcidBenefit:mB,mcidHarm:mH,measure}=data;
-  const meta=V[verdict.verdict];
-  const xMin=Math.min(.3,cL*.85),xMax=Math.max(2,cU*1.15);
-  const layout={height:180,margin:{l:20,r:20,t:30,b:55},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',showlegend:false,
-    xaxis:{type:'log',range:[Math.log10(xMin),Math.log10(xMax)],
-      tickvals:[.25,.5,.7,.8,.91,1,1.1,1.25,1.5,2,3].filter(v=>v>=xMin&&v<=xMax),tickformat:'.2g',
-      title:{text:measure,font:{size:12}},gridcolor:'#eeeeda'},
-    yaxis:{range:[-1,1],showticklabels:false,showgrid:false,zeroline:false},
-    shapes:[
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(xMin),x1:Math.log10(mB),y0:0,y1:1,fillcolor:'rgba(46,125,50,.06)',line:{width:0}},
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mH),y0:0,y1:1,fillcolor:'rgba(100,100,100,.03)',line:{width:0}},
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(ROPE_L_R),x1:Math.log10(ROPE_U_R),y0:0,y1:1,fillcolor:'rgba(107,114,128,.06)',line:{width:0}},
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(xMax),y0:0,y1:1,fillcolor:'rgba(198,40,40,.06)',line:{width:0}},
-      {type:'line',xref:'x',yref:'paper',x0:0,x1:0,y0:0,y1:1,line:{color:'#6b6b68',dash:'dot',width:1.5}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1.5}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1.5}}
-    ],
-    annotations:[
-      {x:Math.log10(mB),y:-.85,xref:'x',yref:'paper',text:'MCID<br>'+mB,showarrow:false,font:{size:9,color:'#2e7d32'},xanchor:'center'},
-      {x:0,y:-.85,xref:'x',yref:'paper',text:'Null<br>1.0',showarrow:false,font:{size:9,color:'#555'},xanchor:'center'},
-      {x:Math.log10(mH),y:-.85,xref:'x',yref:'paper',text:'MCID<br>'+mH,showarrow:false,font:{size:9,color:'#c62828'},xanchor:'center'},
-      {x:(Math.log10(ROPE_L_R)+Math.log10(ROPE_U_R))/2,y:1.05,xref:'x',yref:'paper',text:'ROPE',showarrow:false,font:{size:8,color:'#6b7280'},xanchor:'center'}
-    ]
+function getInputs() {
+  const method = document.querySelector('input[name="inputMethod"]:checked').value;
+  const measure = document.querySelector('input[name="measure"]:checked').value;
+  const studyName = document.getElementById("studyName").value.trim();
+  const mcidBenefit = parseFloat(document.getElementById("mcidBenefit").value);
+  const mcidHarm = parseFloat(document.getElementById("mcidHarm").value);
+  const pRaw = document.getElementById("pValue").value;
+  const pValue = pRaw ? parseFloat(pRaw) : null;
+
+  if (Number.isNaN(mcidBenefit) || Number.isNaN(mcidHarm)) {
+    return { error: "Benefit and harm MCID values are required." };
+  }
+  if (mcidBenefit >= 1) {
+    return { error: "MCID-benefit must be below 1.0 for lower-is-better ratio measures." };
+  }
+  if (mcidHarm <= 1) {
+    return { error: "MCID-harm must be above 1.0." };
+  }
+  if (mcidBenefit >= mcidHarm) {
+    return { error: "MCID-benefit must be smaller than MCID-harm." };
+  }
+
+  let observedRatio;
+  let ciLower;
+  let ciUpper;
+  let logEffect;
+  let se;
+
+  if (method === "ratio") {
+    observedRatio = parseFloat(document.getElementById("effectSize").value);
+    ciLower = parseFloat(document.getElementById("ciLower").value);
+    ciUpper = parseFloat(document.getElementById("ciUpper").value);
+
+    if ([observedRatio, ciLower, ciUpper].some((value) => Number.isNaN(value) || value <= 0)) {
+      return { error: "Enter valid positive numbers for the ratio estimate and confidence interval." };
+    }
+    if (ciLower >= ciUpper) {
+      return { error: "CI lower must be smaller than CI upper." };
+    }
+    logEffect = Math.log(observedRatio);
+    se = (Math.log(ciUpper) - Math.log(ciLower)) / (2 * 1.96);
+  } else {
+    let a = parseFloat(document.getElementById("eventsTx").value);
+    let b = parseFloat(document.getElementById("totalTx").value) - a;
+    let c = parseFloat(document.getElementById("eventsCtrl").value);
+    let d = parseFloat(document.getElementById("totalCtrl").value) - c;
+
+    if ([a, b, c, d].some((value) => Number.isNaN(value))) {
+      return { error: "Enter valid event counts and totals." };
+    }
+    if ([a, b, c, d].some((value) => value < 0)) {
+      return { error: "Counts and derived non-event counts must be zero or positive." };
+    }
+    if ([a, b, c, d].some((value) => value === 0)) {
+      a += 0.5;
+      b += 0.5;
+      c += 0.5;
+      d += 0.5;
+    }
+
+    const oddsRatio = (a * d) / (b * c);
+    se = Math.sqrt((1 / a) + (1 / b) + (1 / c) + (1 / d));
+    logEffect = Math.log(oddsRatio);
+    observedRatio = oddsRatio;
+    ciLower = Math.exp(logEffect - (1.96 * se));
+    ciUpper = Math.exp(logEffect + (1.96 * se));
+  }
+
+  return {
+    studyName,
+    measure,
+    observedRatio,
+    ciLower,
+    ciUpper,
+    logEffect,
+    se,
+    mcidBenefit,
+    mcidHarm,
+    pValue
   };
-  Plotly.newPlot('ciForestPlot',[
-    {x:[cL,cU],y:[0,0],mode:'lines',line:{color:meta.color,width:4},hoverinfo:'skip'},
-    {x:[cL,cL,cL],y:[-.15,0,.15],mode:'lines',line:{color:meta.color,width:2},hoverinfo:'skip'},
-    {x:[cU,cU,cU],y:[-.15,0,.15],mode:'lines',line:{color:meta.color,width:2},hoverinfo:'skip'},
-    {x:[eff],y:[0],mode:'markers',marker:{symbol:'diamond',size:14,color:meta.color,line:{color:'#fff',width:1.5}},
-     hovertemplate:`${measure}: ${eff.toFixed(3)}<br>95% CI: ${cL.toFixed(3)}–${cU.toFixed(3)}<extra></extra>`}
-  ],layout,{displayModeBar:false,responsive:true});
 }
 
-// ============================================================
-// RENDER: Posterior Density
-// ============================================================
-function renderPosterior(br,data){
-  const{mcidBenefit:mB,mcidHarm:mH,measure}=data;
-  const aM=br.flatMap(r=>[r.post.mean,r.mean]),aS=br.flatMap(r=>[r.post.sd,r.sd]);
-  const xMn=Math.min(...aM.map((m,i)=>m-3.5*aS[i])),xMx=Math.max(...aM.map((m,i)=>m+3.5*aS[i]));
-  const N=300,xs=[...Array(N)].map((_,i)=>xMn+(xMx-xMn)*i/(N-1));
-  const traces=[];
-  br.forEach((r,ri)=>{
-    if(r.sd<5)traces.push({x:xs.map(Math.exp),y:xs.map(x=>normalPDF(x,r.mean,r.sd)/Math.exp(x)),mode:'lines',line:{color:r.color,width:1.5,dash:'dot'},opacity:.35,name:r.name+' prior',hoverinfo:'skip',showlegend:false});
-    const postY=xs.map(x=>normalPDF(x,r.post.mean,r.post.sd)/Math.exp(x));
-    traces.push({x:xs.map(Math.exp),y:postY,mode:'lines',line:{color:r.color,width:2.5},name:r.name,hovertemplate:`${r.name}<br>${measure}: %{x:.3f}<extra></extra>`});
-    // Benefit fill (green) and harm fill (red) for first prior only
-    if(ri===0){
-      const bX=[],bY=[],hX=[],hY=[];
-      xs.forEach((x,i)=>{if(x<0){bX.push(Math.exp(x));bY.push(postY[i]);}if(x>0){hX.push(Math.exp(x));hY.push(postY[i]);}});
-      if(bX.length>1)traces.push({x:[...bX,bX[bX.length-1],bX[0]],y:[...bY,0,0],fill:'toself',fillcolor:'rgba(23,119,93,.12)',line:{width:0},showlegend:false,hoverinfo:'skip',name:'_benefit'});
-      if(hX.length>1)traces.push({x:[...hX,hX[hX.length-1],hX[0]],y:[...hY,0,0],fill:'toself',fillcolor:'rgba(197,103,58,.12)',line:{width:0},showlegend:false,hoverinfo:'skip',name:'_harm'});
+function classify(ciLower, ciUpper, mcidBenefit, mcidHarm) {
+  const steps = [];
+  const excludesNull = ciUpper < 1 || ciLower > 1;
+  const benefitExcluded = ciLower > mcidBenefit;
+  const harmExcluded = ciUpper < mcidHarm;
+  const meaningfulBenefitPossible = ciLower <= mcidBenefit;
+  const meaningfulHarmPossible = ciUpper >= mcidHarm;
+
+  if (excludesNull) {
+    steps.push(`The 95% confidence interval (${ciLower.toFixed(3)} to ${ciUpper.toFixed(3)}) excludes the null value of 1.0.`);
+    if (ciUpper < 1) {
+      steps.push("The full interval lies on the benefit side of the null.");
+      if (ciUpper <= mcidBenefit) {
+        steps.push(`The upper 95% CI bound (${ciUpper.toFixed(3)}) remains beyond the prespecified benefit MCID (${mcidBenefit.toFixed(2)}).`);
+        return {
+          verdict: "POSITIVE",
+          excludesNull,
+          benefitExcluded,
+          harmExcluded,
+          meaningfulBenefitPossible,
+          meaningfulHarmPossible,
+          steps
+        };
+      }
+      steps.push(`The upper 95% CI bound (${ciUpper.toFixed(3)}) crosses back over the benefit MCID (${mcidBenefit.toFixed(2)}), so magnitude remains uncertain.`);
+      return {
+        verdict: "IMPRECISE_POSITIVE",
+        excludesNull,
+        benefitExcluded,
+        harmExcluded,
+        meaningfulBenefitPossible,
+        meaningfulHarmPossible,
+        steps
+      };
+    }
+
+    steps.push("The full interval lies on the harm side of the null.");
+    if (ciLower >= mcidHarm) {
+      steps.push(`The lower 95% CI bound (${ciLower.toFixed(3)}) remains beyond the prespecified harm MCID (${mcidHarm.toFixed(2)}).`);
+      return {
+        verdict: "HARMFUL",
+        excludesNull,
+        benefitExcluded,
+        harmExcluded,
+        meaningfulBenefitPossible,
+        meaningfulHarmPossible,
+        steps
+      };
+    }
+
+    steps.push(`The lower 95% CI bound (${ciLower.toFixed(3)}) does not fully clear the harm MCID (${mcidHarm.toFixed(2)}), so the direction is harmful but the clinical magnitude remains uncertain.`);
+    return {
+      verdict: "IMPRECISE_HARMFUL",
+      excludesNull,
+      benefitExcluded,
+      harmExcluded,
+      meaningfulBenefitPossible,
+      meaningfulHarmPossible,
+      steps
+    };
+  }
+
+  steps.push(`The 95% confidence interval (${ciLower.toFixed(3)} to ${ciUpper.toFixed(3)}) includes the null value of 1.0.`);
+  steps.push(benefitExcluded
+    ? `A clinically important benefit is excluded because the lower 95% CI bound (${ciLower.toFixed(3)}) lies above the benefit MCID (${mcidBenefit.toFixed(2)}).`
+    : `A clinically important benefit remains compatible with the data because the lower 95% CI bound (${ciLower.toFixed(3)}) still reaches the benefit MCID zone.`
+  );
+  steps.push(harmExcluded
+    ? `A clinically important harm is excluded because the upper 95% CI bound (${ciUpper.toFixed(3)}) lies below the harm MCID (${mcidHarm.toFixed(2)}).`
+    : `A clinically important harm remains compatible with the data because the upper 95% CI bound (${ciUpper.toFixed(3)}) still reaches the harm MCID zone.`
+  );
+
+  if (!benefitExcluded && !harmExcluded) {
+    steps.push("Clinically important benefit and harm are both still compatible with the data.");
+    return {
+      verdict: "INCONCLUSIVE_UNDERPOWERED",
+      excludesNull,
+      benefitExcluded,
+      harmExcluded,
+      meaningfulBenefitPossible,
+      meaningfulHarmPossible,
+      steps
+    };
+  }
+
+  if (benefitExcluded && harmExcluded) {
+    steps.push("Both clinically important benefit and clinically important harm are excluded.");
+    return {
+      verdict: "NEUTRAL",
+      excludesNull,
+      benefitExcluded,
+      harmExcluded,
+      meaningfulBenefitPossible,
+      meaningfulHarmPossible,
+      steps
+    };
+  }
+
+  if (benefitExcluded && !harmExcluded) {
+    steps.push("Clinically important benefit is ruled out, but a relevant downside remains possible.");
+    return {
+      verdict: "NEGATIVE",
+      excludesNull,
+      benefitExcluded,
+      harmExcluded,
+      meaningfulBenefitPossible,
+      meaningfulHarmPossible,
+      steps
+    };
+  }
+
+  steps.push("Benefit is still plausible, so the data are not definitive.");
+  return {
+    verdict: "INCONCLUSIVE_UNDERPOWERED",
+    excludesNull,
+    benefitExcluded,
+    harmExcluded,
+    meaningfulBenefitPossible,
+    meaningfulHarmPossible,
+    steps
+  };
+}
+
+function renderBanner(result, data) {
+  const meta = VERDICT_META[result.verdict];
+  const studyPrefix = data.studyName ? `${data.studyName} - ` : "";
+  document.getElementById("verdictBanner").innerHTML = `
+    <div class="verdict-banner verdict-${meta.className}">
+      <h2>${meta.label}</h2>
+      <p>${meta.tagline}</p>
+      <div class="study-line">${studyPrefix}${data.measure} ${data.observedRatio.toFixed(3)} (95% CI ${data.ciLower.toFixed(3)} - ${data.ciUpper.toFixed(3)}), ${formatPValue(data.pValue)}</div>
+    </div>
+  `;
+}
+
+function renderMetricChips(result) {
+  const chips = [
+    result.excludesNull ? "Null excluded" : "Null included",
+    result.benefitExcluded ? "Clinically important benefit excluded" : "Clinically important benefit still possible",
+    result.harmExcluded ? "Clinically important harm excluded" : "Clinically important harm still possible"
+  ];
+  document.getElementById("metricChips").innerHTML = chips
+    .map((chip) => `<span class="metric-chip">${chip}</span>`)
+    .join("");
+}
+
+function renderCIPlot(data, result) {
+  const meta = VERDICT_META[result.verdict];
+  const xMin = Math.min(0.30, data.ciLower * 0.84, data.mcidBenefit * 0.82);
+  const xMax = Math.max(3.00, data.ciUpper * 1.18, data.mcidHarm * 1.12);
+  const tickValues = [0.25, 0.5, 0.7, 0.8, 1.0, 1.25, 1.5, 2, 3].filter((value) => value >= xMin && value <= xMax);
+
+  Plotly.newPlot("ciPlot", [
+    {
+      x: [data.ciLower, data.ciUpper],
+      y: [0, 0],
+      mode: "lines",
+      line: { color: meta.color, width: 4 },
+      hoverinfo: "skip"
+    },
+    {
+      x: [data.ciLower, data.ciLower, data.ciLower],
+      y: [-0.15, 0, 0.15],
+      mode: "lines",
+      line: { color: meta.color, width: 2 },
+      hoverinfo: "skip"
+    },
+    {
+      x: [data.ciUpper, data.ciUpper, data.ciUpper],
+      y: [-0.15, 0, 0.15],
+      mode: "lines",
+      line: { color: meta.color, width: 2 },
+      hoverinfo: "skip"
+    },
+    {
+      x: [data.observedRatio],
+      y: [0],
+      mode: "markers",
+      marker: {
+        size: 14,
+        color: meta.color,
+        symbol: "diamond",
+        line: { color: "#ffffff", width: 1.5 }
+      },
+      hovertemplate: `${data.measure}: ${data.observedRatio.toFixed(3)}<br>95% CI: ${data.ciLower.toFixed(3)} - ${data.ciUpper.toFixed(3)}<extra></extra>`
+    }
+  ], {
+    height: 260,
+    margin: { l: 24, r: 24, t: 20, b: 62 },
+    paper_bgcolor: "transparent",
+    plot_bgcolor: "#fbfaf7",
+    showlegend: false,
+    xaxis: {
+      type: "log",
+      range: [Math.log10(xMin), Math.log10(xMax)],
+      tickvals: tickValues,
+      tickformat: ".2g",
+      title: { text: data.measure, font: { size: 12 } },
+      gridcolor: "#ece6db"
+    },
+    yaxis: {
+      range: [-1, 1],
+      showticklabels: false,
+      showgrid: false,
+      zeroline: false
+    },
+    shapes: [
+      {
+        type: "rect",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(xMin),
+        x1: Math.log10(data.mcidBenefit),
+        y0: 0,
+        y1: 1,
+        fillcolor: "rgba(23, 119, 93, 0.07)",
+        line: { width: 0 }
+      },
+      {
+        type: "rect",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(data.mcidBenefit),
+        x1: Math.log10(data.mcidHarm),
+        y0: 0,
+        y1: 1,
+        fillcolor: "rgba(106, 114, 128, 0.04)",
+        line: { width: 0 }
+      },
+      {
+        type: "rect",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(data.mcidHarm),
+        x1: Math.log10(xMax),
+        y0: 0,
+        y1: 1,
+        fillcolor: "rgba(181, 58, 49, 0.06)",
+        line: { width: 0 }
+      },
+      {
+        type: "line",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(1),
+        x1: Math.log10(1),
+        y0: 0,
+        y1: 1,
+        line: { color: "#74808a", dash: "dot", width: 1.5 }
+      },
+      {
+        type: "line",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(data.mcidBenefit),
+        x1: Math.log10(data.mcidBenefit),
+        y0: 0,
+        y1: 1,
+        line: { color: "#17775d", dash: "dash", width: 1.5 }
+      },
+      {
+        type: "line",
+        xref: "x",
+        yref: "paper",
+        x0: Math.log10(data.mcidHarm),
+        x1: Math.log10(data.mcidHarm),
+        y0: 0,
+        y1: 1,
+        line: { color: "#b53a31", dash: "dash", width: 1.5 }
+      }
+    ],
+    annotations: [
+      {
+        x: Math.log10(data.mcidBenefit),
+        y: -0.32,
+        xref: "x",
+        yref: "paper",
+        text: `Benefit MCID<br>${data.mcidBenefit.toFixed(2)}`,
+        showarrow: false,
+        font: { size: 10, color: "#17775d" },
+        xanchor: "center"
+      },
+      {
+        x: Math.log10(1),
+        y: -0.32,
+        xref: "x",
+        yref: "paper",
+        text: "Null<br>1.00",
+        showarrow: false,
+        font: { size: 10, color: "#6a7280" },
+        xanchor: "center"
+      },
+      {
+        x: Math.log10(data.mcidHarm),
+        y: -0.32,
+        xref: "x",
+        yref: "paper",
+        text: `Harm MCID<br>${data.mcidHarm.toFixed(2)}`,
+        showarrow: false,
+        font: { size: 10, color: "#b53a31" },
+        xanchor: "center"
+      }
+    ]
+  }, { displayModeBar: false, responsive: true });
+}
+
+function reportingTemplate(result, data) {
+  const reduction = Math.round((1 - data.mcidBenefit) * 100);
+  const prefix = `${data.measure} ${data.observedRatio.toFixed(2)} (95% CI ${data.ciLower.toFixed(2)} to ${data.ciUpper.toFixed(2)}; ${formatPValue(data.pValue)}).`;
+
+  const templates = {
+    POSITIVE: `${prefix} The upper confidence bound remains beyond the prespecified benefit MCID (${data.mcidBenefit.toFixed(2)}), supporting a statistically and clinically important benefit.`,
+    IMPRECISE_POSITIVE: `${prefix} Although the result is statistically significant, the interval still crosses the prespecified benefit MCID (${data.mcidBenefit.toFixed(2)}), so effect magnitude remains uncertain.`,
+    NEUTRAL: `${prefix} Both clinically important benefit and clinically important harm are excluded, supporting a neutral interpretation rather than simple non-significance.`,
+    NEGATIVE: `${prefix} A benefit of at least ${reduction}% is excluded, but the interval still allows a relevant downside; the result is therefore negative rather than neutral.`,
+    INCONCLUSIVE_UNDERPOWERED: `${prefix} The interval still includes clinically important benefit and/or clinically important harm, so the result should be interpreted as inconclusive rather than as evidence of no effect.`,
+    HARMFUL: `${prefix} The lower confidence bound remains beyond the prespecified harm MCID (${data.mcidHarm.toFixed(2)}), supporting clinically important harm.`,
+    IMPRECISE_HARMFUL: `${prefix} Harm is statistically favored, but the lower confidence bound does not fully clear the harm MCID (${data.mcidHarm.toFixed(2)}), so the clinical magnitude remains uncertain.`
+  };
+
+  return templates[result.verdict];
+}
+
+function percentage(value) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function renderPriorSensitivity(priorRows, data) {
+  const rows = priorRows.map((row) => `
+    <tr>
+      <td>
+        <strong>${row.name}</strong><br>
+        <span style="color: var(--muted); font-size: 0.78rem;">${row.rationale}</span>
+      </td>
+      <td>${data.measure} ${row.posteriorMedian.toFixed(3)}<br><span style="color: var(--muted); font-size: 0.78rem;">${row.crILower.toFixed(3)} to ${row.crIUpper.toFixed(3)}</span></td>
+      <td>${percentage(row.pBenefit)}</td>
+      <td>${percentage(row.pMCIDBenefit)}</td>
+      <td>${percentage(row.pIndifference)}</td>
+      <td>${percentage(row.pMCIDHarm)}</td>
+    </tr>
+  `).join("");
+
+  const mcidBenefitRange = [Math.min(...priorRows.map((row) => row.pMCIDBenefit)), Math.max(...priorRows.map((row) => row.pMCIDBenefit))];
+  const mcidHarmRange = [Math.min(...priorRows.map((row) => row.pMCIDHarm)), Math.max(...priorRows.map((row) => row.pMCIDHarm))];
+
+  document.getElementById("priorSensitivity").innerHTML = `
+    <span class="prior-badge">Flat + skeptical + directional priors</span>
+    <table class="prior-table" style="margin-top: 14px;">
+      <thead>
+        <tr>
+          <th>Prior</th>
+          <th>Posterior median (95% CrI)</th>
+          <th>Pr(benefit)</th>
+          <th>Pr(MCID benefit)</th>
+          <th>Pr(indifference)</th>
+          <th>Pr(MCID harm)</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="prior-note">
+      <strong>Scientific summary.</strong><br>
+      Across the selected prior set, posterior probability of clinically important benefit ranges from <strong>${percentage(mcidBenefitRange[0])}</strong> to <strong>${percentage(mcidBenefitRange[1])}</strong>, while posterior probability of clinically important harm ranges from <strong>${percentage(mcidHarmRange[0])}</strong> to <strong>${percentage(mcidHarmRange[1])}</strong>. This is intended as a prior-sensitivity check rather than as the primary decision rule.
+    </div>
+  `;
+}
+
+function renderReasoning(result, data) {
+  const stepsHtml = result.steps.map((step, index) => `
+    <div class="step-item">
+      <div class="step-index">${index + 1}</div>
+      <div class="step-body">${step}</div>
+    </div>
+  `).join("");
+
+  document.getElementById("freqReasoning").innerHTML = `
+    <div class="steps-list">${stepsHtml}</div>
+    <div class="reporting-box">
+      <strong>Suggested reporting line</strong>
+      <em>${reportingTemplate(result, data)}</em>
+    </div>
+  `;
+}
+
+function chooseFigures(verdictKey) {
+  const selected = [FIGURES.algorithm];
+
+  if (verdictKey === "INCONCLUSIVE_UNDERPOWERED") {
+    selected.push(FIGURES.underpowered, FIGURES.threeFaces);
+  } else if (verdictKey === "NEGATIVE" || verdictKey === "NEUTRAL") {
+    selected.push(FIGURES.negVsNeutral, FIGURES.threeFaces);
+  } else {
+    selected.push(FIGURES.sixScenarios, FIGURES.threeFaces);
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  selected.forEach((figure) => {
+    if (!seen.has(figure.src)) {
+      deduped.push(figure);
+      seen.add(figure.src);
     }
   });
-  const xMnR=Math.exp(xMn),xMxR=Math.exp(xMx);
-  Plotly.newPlot('posteriorDensityPlot',traces,{
-    height:320,margin:{l:40,r:20,t:30,b:60},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
-    legend:{orientation:'h',y:-.2,x:.5,xanchor:'center',font:{size:11}},
-    xaxis:{type:'log',range:[Math.log10(Math.max(.1,xMnR)),Math.log10(Math.min(5,xMxR))],title:{text:measure,font:{size:12}},tickvals:[.25,.5,.7,.8,1,1.25,1.5,2,3],tickformat:'.2g',gridcolor:'#eeeeda'},
-    yaxis:{title:{text:'Density',font:{size:12}},showgrid:false,zeroline:false},
-    shapes:[
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(Math.max(.05,xMnR)),x1:Math.log10(mB),y0:0,y1:1,fillcolor:'rgba(46,125,50,.05)',line:{width:0}},
-      {type:'rect',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(Math.min(10,xMxR)),y0:0,y1:1,fillcolor:'rgba(198,40,40,.05)',line:{width:0}},
-      {type:'line',xref:'x',yref:'paper',x0:0,x1:0,y0:0,y1:1,line:{color:'#888',dash:'dot',width:1.5}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1.5}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1.5}}
-    ]
-  },{displayModeBar:false,responsive:true});
+  return deduped.slice(0, 2);
 }
 
-// ============================================================
-// RENDER: CDF Plot (matching bayesian-trial-reanalysis style)
-// ============================================================
-function renderCDF(br,data){
-  const{mcidBenefit:mB,mcidHarm:mH,measure}=data;
-  const xMin=0.3,xMax=3.0,N=200;
-  const xVals=[...Array(N)].map((_,i)=>xMin+(xMax-xMin)*i/(N-1));
-  const traces=[];
-  br.forEach(r=>{
-    // P(ratio < threshold) for each threshold x — CDF
-    const yVals=xVals.map(x=>normalCDF(Math.log(x),r.post.mean,r.post.sd));
-    traces.push({x:xVals,y:yVals,mode:'lines',name:r.name,line:{color:r.color,width:2.5},
-      hovertemplate:`${r.name}<br>${measure} < %{x:.2f}: %{y:.1%}<extra></extra>`});
-  });
-  // Markers at key thresholds for skeptical prior
-  const sk=br.find(r=>r.name==='Skeptical');
-  if(sk){
-    const keys=[{x:1.0,label:'Pr(benefit)',color:'#17775d'},{x:mB,label:'Pr(MCID benefit)',color:'#2e7d32'},{x:mH,label:`Pr(${measure}<${mH})`,color:'#c62828'}];
-    keys.forEach(k=>{
-      const y=normalCDF(Math.log(k.x),sk.post.mean,sk.post.sd);
-      traces.push({x:[k.x],y:[y],mode:'markers+text',marker:{size:10,color:k.color,symbol:'circle'},
-        text:[`${(y*100).toFixed(0)}%`],textposition:'top right',textfont:{size:10,color:k.color},
-        showlegend:false,hovertemplate:`${k.label}: ${(y*100).toFixed(1)}%<extra></extra>`});
-    });
+function renderFigures(verdictKey) {
+  const figures = chooseFigures(verdictKey);
+  document.getElementById("figureGallery").innerHTML = figures.map((figure) => `
+    <article class="figure-card">
+      <img src="${figure.src}" alt="${figure.title}">
+      <div class="figure-copy">
+        <h3>${figure.title}</h3>
+        <p>${figure.body}</p>
+      </div>
+    </article>
+  `).join("");
+}
+
+let lastData = null;
+let lastResult = null;
+let lastPriorRows = null;
+
+function runClassifier() {
+  const errorBox = document.getElementById("inputError");
+  errorBox.style.display = "none";
+  errorBox.textContent = "";
+
+  const data = getInputs();
+  if (data.error) {
+    errorBox.textContent = data.error;
+    errorBox.style.display = "block";
+    return;
   }
-  Plotly.newPlot('cdfPlot',traces,{
-    height:280,margin:{l:50,r:20,t:30,b:50},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
-    title:{text:'Cumulative Distribution Function — P('+measure+' < threshold)',font:{size:12}},
-    legend:{orientation:'h',y:-.22,x:.5,xanchor:'center',font:{size:11}},
-    xaxis:{type:'log',range:[Math.log10(xMin),Math.log10(xMax)],title:{text:measure+' threshold',font:{size:11}},
-      tickvals:[.3,.5,.7,.8,1,1.25,1.5,2,3],tickformat:'.2g',gridcolor:'#eeeeda'},
-    yaxis:{range:[0,1],title:{text:'Cumulative Probability',font:{size:11}},gridcolor:'#eeeeda',
-      tickvals:[0,.1,.25,.5,.75,.9,1],tickformat:'.0%'},
-    shapes:[
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(1),x1:Math.log10(1),y0:0,y1:1,line:{color:'#888',dash:'dot',width:1}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1}}
-    ]
-  },{displayModeBar:false,responsive:true});
+
+  const result = classify(data.ciLower, data.ciUpper, data.mcidBenefit, data.mcidHarm);
+  const priorRows = posteriorSensitivity(data.logEffect, data.se, data.mcidBenefit, data.mcidHarm);
+  lastData = data;
+  lastResult = result;
+  lastPriorRows = priorRows;
+
+  renderBanner(result, data);
+  renderCIPlot(data, result);
+  renderMetricChips(result);
+  renderReasoning(result, data);
+  renderPriorSensitivity(priorRows, data);
+  renderFigures(result.verdict);
+
+  const resultsSection = document.getElementById("resultsSection");
+  resultsSection.hidden = false;
+  resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// ============================================================
-// RENDER: Forest Plot (matching bayesian-trial-reanalysis style)
-// ============================================================
-function renderForestBayes(br,data,I2){
-  const{measure,mcidBenefit:mB,mcidHarm:mH}=data;
-  const names=br.map(r=>r.name).reverse();
-  const meds=br.map(r=>r.postMedian).reverse();
-  const loCI=br.map(r=>r.crIL).reverse();
-  const hiCI=br.map(r=>r.crIH).reverse();
-  const colors=br.map(r=>r.color).reverse();
+async function downloadReport() {
+  if (!lastData || !lastResult || !lastPriorRows) return;
 
-  const traces=[
-    // CrI lines
-    ...br.map((r,i)=>({
-      x:[loCI[i],hiCI[i]],y:[names[i],names[i]],mode:'lines',
-      line:{color:colors[i],width:3},showlegend:false,hoverinfo:'skip'
-    })),
-    // Point estimates
-    {x:meds,y:names,mode:'markers',marker:{size:12,color:colors,symbol:'diamond',line:{color:'#fff',width:1.5}},
-     showlegend:false,hovertemplate:'%{y}<br>'+measure+': %{x:.3f}<extra></extra>'}
-  ];
-
-  const xMin=Math.min(.3,Math.min(...loCI)*.85),xMax=Math.max(2,Math.max(...hiCI)*1.15);
-  Plotly.newPlot('forestPlot',traces,{
-    height:180,margin:{l:90,r:20,t:30,b:50},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
-    title:{text:`Posterior Forest Plot — I² = ${I2}%${I2<25?' (robust)':I2<50?' (moderate)':' (sensitive)'}`,font:{size:12}},
-    xaxis:{type:'log',range:[Math.log10(xMin),Math.log10(xMax)],title:{text:measure+' (95% CrI)',font:{size:11}},
-      tickvals:[.3,.5,.7,.8,1,1.25,1.5,2,3].filter(v=>v>=xMin&&v<=xMax),tickformat:'.2g',gridcolor:'#eeeeda'},
-    yaxis:{autorange:true},
-    shapes:[
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(1),x1:Math.log10(1),y0:0,y1:1,line:{color:'#888',dash:'dot',width:1.5}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1}},
-      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1}}
-    ]
-  },{displayModeBar:false,responsive:true});
-}
-
-// ============================================================
-// RENDER: Bayes Table (with Pr(severe harm))
-// ============================================================
-function pct(v){return(v*100).toFixed(1)+'%';}
-function cc(v,t){
-  if(t==='b')return v>.9?'cell-green':v>.5?'cell-yellow':v>.1?'cell-orange':'cell-red';
-  if(t==='r')return v>.8?'cell-green':v>.3?'cell-yellow':'cell-red';
-  if(t==='h')return v<.1?'cell-green':v<.3?'cell-yellow':v<.5?'cell-orange':'cell-red';
-  return '';
-}
-function renderTable(br,measure){
-  let h=`<table class="bayes-table"><thead><tr>
-    <th>Prior</th><th>Posterior (95% CrI)</th><th>Pr(benefit)</th><th>Pr(MCID benefit)</th>
-    <th>Pr(ROPE)</th><th>Pr(harm)</th><th>Pr(severe harm)</th>
-  </tr></thead><tbody>`;
-  br.forEach(r=>{
-    h+=`<tr>
-      <td><span style="display:inline-block;width:10px;height:10px;background:${r.color};border-radius:50%;margin-right:5px"></span>${r.name}<br><span style="font-size:.72rem;color:#888">${r.desc}</span></td>
-      <td>${measure} ${r.postMedian.toFixed(3)}<br><span style="font-size:.75rem;color:#888">(${r.crIL.toFixed(3)}–${r.crIH.toFixed(3)})</span></td>
-      <td class="${cc(r.pBenefit,'b')}">${pct(r.pBenefit)}</td>
-      <td class="${cc(r.pMCID,'b')}">${pct(r.pMCID)}</td>
-      <td class="${cc(r.pROPE,'r')}">${pct(r.pROPE)}</td>
-      <td class="${cc(r.pHarm,'h')}">${pct(r.pHarm)}</td>
-      <td class="${cc(r.pSevereHarm,'h')}">${pct(r.pSevereHarm)}</td>
-    </tr>`;
+  const plotImage = await Plotly.toImage(document.getElementById("ciPlot"), {
+    format: "svg",
+    width: 900,
+    height: 260
   });
-  h+='</tbody></table>';
-  document.getElementById('bayesTableContainer').innerHTML=h;
+
+  const meta = VERDICT_META[lastResult.verdict];
+  const date = new Date().toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const steps = lastResult.steps.map((step, index) => `
+    <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #ece6db">
+      <div style="min-width:26px; height:26px; border-radius:50%; background:#dff3ee; color:#0d3741; font-weight:700; display:flex; align-items:center; justify-content:center">${index + 1}</div>
+      <div>${step}</div>
+    </div>
+  `).join("");
+  const priorTableRows = lastPriorRows.map((row) => `
+    <tr>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;"><strong>${row.name}</strong><br><span style="color:#5f7078; font-size:0.78rem;">${row.rationale}</span></td>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;">${lastData.measure} ${row.posteriorMedian.toFixed(3)}<br><span style="color:#5f7078; font-size:0.78rem;">${row.crILower.toFixed(3)} to ${row.crIUpper.toFixed(3)}</span></td>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;">${percentage(row.pBenefit)}</td>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;">${percentage(row.pMCIDBenefit)}</td>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;">${percentage(row.pIndifference)}</td>
+      <td style="padding:10px 8px; border-bottom:1px solid #ece6db;">${percentage(row.pMCIDHarm)}</td>
+    </tr>
+  `).join("");
+
+  const report = `<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <title>${lastData.studyName || "RCT verdict"} - summary</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 900px; margin: 0 auto; padding: 32px 24px; color: #122531; line-height: 1.6; }
+      h1, h2 { font-family: Georgia, serif; letter-spacing: -0.02em; }
+      .banner { padding: 20px 22px; border-radius: 18px; border: 2px solid ${meta.color}; background: #faf8f4; margin-bottom: 24px; }
+      .banner h1 { margin: 0 0 8px; font-size: 1.9rem; color: ${meta.color}; }
+      .muted { color: #5f7078; }
+      .box { margin-top: 22px; padding: 18px 20px; border-radius: 18px; background: #f6fbfa; border: 1px solid rgba(21,115,107,0.14); }
+      img { width: 100%; border: 1px solid #e8e1d6; border-radius: 16px; background: white; }
+      table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.86rem; }
+      th { background: #0f233f; color: white; padding: 10px 8px; text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; }
+      footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece6db; color: #5f7078; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>${meta.label}</h1>
+      <div>${lastData.studyName ? `${lastData.studyName} - ` : ""}${lastData.measure} ${lastData.observedRatio.toFixed(3)} (95% CI ${lastData.ciLower.toFixed(3)} - ${lastData.ciUpper.toFixed(3)}), ${formatPValue(lastData.pValue)}</div>
+      <p style="margin-top:10px">${meta.tagline}</p>
+    </div>
+
+    <h2>Confidence interval view</h2>
+    <img src="${plotImage}" alt="CI plot">
+
+    <h2>Step-by-step interpretation</h2>
+    ${steps}
+
+    <div class="box">
+      <strong>Suggested reporting line</strong><br>
+      ${reportingTemplate(lastResult, lastData)}
+    </div>
+
+    <h2>Prior sensitivity</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Prior</th>
+          <th>Posterior median (95% CrI)</th>
+          <th>Pr(benefit)</th>
+          <th>Pr(MCID benefit)</th>
+          <th>Pr(indifference)</th>
+          <th>Pr(MCID harm)</th>
+        </tr>
+      </thead>
+      <tbody>${priorTableRows}</tbody>
+    </table>
+
+    <footer>
+      Generated on ${date} with the RCT Verdict Classifier. The primary verdict remains CI + MCID based; posterior probabilities are shown as prior-sensitivity support.
+    </footer>
+  </body>
+  </html>`;
+
+  const blob = new Blob([report], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${(lastData.studyName || "rct-verdict").replace(/\s+/g, "-").toLowerCase()}-summary.html`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
-// ============================================================
-// NARRATIVES
-// ============================================================
-function freqNarrative(verdict,data){
-  const meta=V[verdict.verdict];
-  const{ciLower:cL,ciUpper:cU,mcidBenefit:mB,mcidHarm:mH,observedRatio:eff,measure:ms,pValue:pv}=data;
-  let h='<ul class="steps-list">';
-  verdict.R.forEach(s=>{h+=`<li class="step-item"><span class="step-num">${s.n}</span><span class="step-text">${s.t}${s.v?` → <span class="step-verdict">${meta.label}</span>`:''}</span></li>`;});
-  h+='</ul>';
-  const pd=pv?` (p = ${pv<.001?'<0.001':pv.toFixed(3)})`:' (p from CI)';
-  const T={
-    POSITIVE:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; entire CI below MCID-benefit (${mB}). Both statistically and clinically significant benefit. Bayesian Pr(MCID benefit) = [see table]."`,
-    IMPRECISE_POSITIVE:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; benefit statistically significant but CI crosses MCID (${mB}). Effect magnitude uncertain."`,
-    NEUTRAL:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; CI within ROPE. Clinically meaningful difference excluded in both directions. Bayesian Pr(ROPE) = [see table]."`,
-    NEGATIVE:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; CI above MCID-benefit (${mB}) — ≥${Math.round((1-mB)*100)}% reduction excluded. CI extends beyond ROPE — not equivalent. Bayesian Pr(MCID benefit) ≈ [see table]."`,
-    INCONCLUSIVE_UNDERPOWERED:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; wide CI, neither benefit nor harm excluded. Trial underpowered. Bayesian: no probability dominates."`,
-    HARMFUL:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; entire CI above MCID-harm (${mH}). Clinically significant harm confirmed. Bayesian Pr(severe harm) = [see table]."`,
-    IMPRECISE_HARMFUL:`"${ms} = ${eff.toFixed(2)} (95% CI ${cL.toFixed(2)}–${cU.toFixed(2)})${pd}; harm significant but CI crosses MCID-harm (${mH}). Magnitude uncertain."`
-  };
-  h+=`<div class="narrative" style="margin-top:14px"><strong>Reporting template:</strong><br><em>${T[verdict.verdict]||''}</em></div>`;
-  return h;
-}
-
-function bayesNarrative(br,I2,mB,ms){
-  const sk=br.find(r=>r.name==='Skeptical'),op=br.find(r=>r.name==='Optimistic'),pe=br.find(r=>r.name==='Pessimistic');
-  const rob=I2<25?'<strong>robust</strong> to prior choice (I² < 25%) — data dominate.':I2<50?'<strong>moderately sensitive</strong> (I² = '+I2+'%).':'<strong>substantially sensitive</strong> (I² = '+I2+'%).';
-  return`<div class="narrative"><strong>Bayesian interpretation:</strong><br>
-Under a <strong>skeptical prior</strong>: Pr(MCID benefit) = <strong>${pct(sk.pMCID)}</strong>, Pr(ROPE) = ${pct(sk.pROPE)}, Pr(severe harm) = ${pct(sk.pSevereHarm)}.<br>
-Under an <strong>optimistic prior</strong>: Pr(MCID benefit) = <strong>${pct(op.pMCID)}</strong>.<br>
-Under a <strong>pessimistic prior</strong>: Pr(MCID benefit) = <strong>${pct(pe.pMCID)}</strong>, Pr(severe harm) = ${pct(pe.pSevereHarm)}.<br><br>
-Prior sensitivity I² = <strong>${I2}%</strong> — conclusions are ${rob}
-${I2<25?'<br><em>Same conclusion across all priors → data are speaking, not the prior (Zampieri et al., AJRCCM 2021).</em>':''}
-</div>`;
-}
-
-function renderFingerprint(br,freqVerdict){
-  const fp=bayesFingerprint(br);
-  const freqLabel=V[freqVerdict.verdict].label;
-  const bayesLabel=V[fp.match]?V[fp.match].label:fp.match;
-  const agree=freqVerdict.verdict===fp.match;
-  const col=agree?'#16a34a':'#d97706';
-  document.getElementById('bayesFingerprint').innerHTML=`<div class="fingerprint">
-    <strong>Bayesian fingerprint:</strong> ${bayesLabel} <span class="fp-match" style="background:${agree?'#f0fdf4':'#fffbeb'};color:${col};border:1px solid ${col}">${agree?'Agrees with frequentist':'Diverges from frequentist'}</span>
-    <span style="font-size:.8rem;color:#888;margin-left:8px">(confidence: ${fp.confidence})</span>
-    ${!agree?`<br><span style="font-size:.85rem;color:#7c2d12;margin-top:4px;display:inline-block">Frequentist says <strong>${freqLabel}</strong>, Bayesian fingerprint suggests <strong>${bayesLabel}</strong>. Consider the Bayesian probability table carefully.</span>`:''}
-  </div>`;
-}
-
-
-// ============================================================
-// VERDICT BANNER
-// ============================================================
-function renderBanner(verdict,data){
-  const m=V[verdict.verdict];
-  const{observedRatio:e,ciLower:l,ciUpper:u,measure:ms,studyName:sn,pValue:pv}=data;
-  const sp=sn?sn+' — ':'',pp=pv?`, p = ${pv<.001?'<0.001':pv.toFixed(3)}`:'';
-  document.getElementById('verdictBanner').innerHTML=`<div class="verdict-banner verdict-${verdict.verdict}">
-    <div class="verdict-class">${m.label}</div>
-    <div class="verdict-study">${sp}${ms} ${e.toFixed(3)} (95% CI ${l.toFixed(3)}–${u.toFixed(3)})${pp}</div>
-    <div class="verdict-tagline">${m.tag}</div>
-  </div>`;
-}
-
-// ============================================================
-// MAIN
-// ============================================================
-let _d=null,_v=null,_b=null;
-function runClassifier(){
-  const err=document.getElementById('inputError');err.style.display='none';
-  const d=getInputs();
-  if(d.error){err.textContent=d.error;err.style.display='';return;}
-  const v=classify(d.ciLower,d.ciUpper,d.mcidBenefit,d.mcidHarm);
-  const pr=buildPriors(d.expectedEffect,d.mcidBenefit,d.mcidHarm);
-  const br=bayesAnalysis(d.logEffect,d.se,pr,d.mcidBenefit,d.mcidHarm);
-  const{I2}=calcI2(br);
-  _d=d;_v=v;_b=br;
-  renderBanner(v,d);renderForest(d,v);
-  document.getElementById('freqReasoning').innerHTML=freqNarrative(v,d);
-  renderPosterior(br,d);renderCDF(br,d);renderForestBayes(br,d,I2);renderTable(br,d.measure);
-  renderFingerprint(br,v);
-  document.getElementById('bayesNarrative').innerHTML=bayesNarrative(br,I2,d.mcidBenefit,d.measure);
-  document.getElementById('resultsSection').style.display='';
-  document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-// ============================================================
-// DOWNLOAD REPORT
-// ============================================================
-async function downloadReport(){
-  if(!_d)return;
-  const d=_d,v=_v,br=_b,meta=V[v.verdict],{I2}=calcI2(br);
-  const[i1,i2,i3,i4]=await Promise.all([
-    Plotly.toImage(document.getElementById('ciForestPlot'),{format:'svg',width:800,height:180}),
-    Plotly.toImage(document.getElementById('posteriorDensityPlot'),{format:'svg',width:800,height:320}),
-    Plotly.toImage(document.getElementById('cdfPlot'),{format:'svg',width:800,height:280}),
-    Plotly.toImage(document.getElementById('forestPlot'),{format:'svg',width:800,height:180})
-  ]);
-  let tbl='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="background:#f5f4f0"><th style="padding:8px;text-align:left;border-bottom:2px solid #ddd">Prior</th><th style="padding:8px;border-bottom:2px solid #ddd">Posterior</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(benefit)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(MCID)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(ROPE)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(harm)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(severe harm)</th></tr></thead><tbody>';
-  br.forEach(r=>{tbl+=`<tr><td style="padding:8px;border-bottom:1px solid #eee"><strong>${r.name}</strong></td><td style="padding:8px;border-bottom:1px solid #eee">${d.measure} ${r.postMedian.toFixed(3)} (${r.crIL.toFixed(3)}–${r.crIH.toFixed(3)})</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pBenefit)}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${pct(r.pMCID)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pROPE)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pHarm)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pSevereHarm)}</td></tr>`;});
-  tbl+='</tbody></table>';
-  const sk=br.find(r=>r.name==='Skeptical'),sl=d.studyName||'RCT',dt=new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-  const fp=bayesFingerprint(br);
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${sl} — RCT Verdict Report</title>
-<style>body{font-family:-apple-system,sans-serif;max-width:860px;margin:0 auto;padding:32px 24px;color:#1a1a18;line-height:1.6;font-size:15px}h1{font-size:1.5rem}h2{font-size:1.1rem;color:#15736b;margin:28px 0 12px;border-bottom:2px solid #e2e1da;padding-bottom:6px}.vb{padding:20px;border-radius:10px;border:2px solid;margin-bottom:24px}.vc{font-size:1.5rem;font-weight:700}.vs{font-size:.95rem;margin:4px 0 6px}.vt{font-size:.88rem;opacity:.85}.n{background:#f9f9f7;border-left:3px solid #15736b;padding:14px 18px;border-radius:0 8px 8px 0;font-size:.9rem;line-height:1.7;margin-top:14px}img{max-width:100%;border:1px solid #e2e1da;border-radius:8px;margin:8px 0}.st{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f3f2ed}.sn{min-width:24px;height:24px;border-radius:50%;background:#e8f5f4;color:#0d3f3d;font-size:.78rem;font-weight:700;display:flex;align-items:center;justify-content:center}footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e1da;font-size:.8rem;color:#888}</style></head><body>
-<h1>RCT Verdict Report</h1><p style="color:#888;font-size:.88rem;margin-bottom:20px">${sl} · ${dt} · CI + MCID + Bayesian Framework</p>
-<div class="vb" style="background:${meta.tag.includes('benefit')?'#f0fdf4':meta.tag.includes('harm')?'#fef2f2':'#fefce8'};border-color:${meta.color}40">
-<div class="vc" style="color:${meta.color}">${meta.label}</div>
-<div class="vs">${d.studyName?d.studyName+' — ':''}${d.measure} ${d.observedRatio.toFixed(3)} (95% CI ${d.ciLower.toFixed(3)}–${d.ciUpper.toFixed(3)})${d.pValue?', p = '+(d.pValue<.001?'<0.001':d.pValue.toFixed(3)):''}</div>
-<div class="vt">${meta.tag}</div></div>
-<h2>Frequentist Classification</h2><img src="${i1}">
-${v.R.map(s=>`<div class="st"><span class="sn">${s.n}</span><span>${s.t}</span></div>`).join('')}
-<h2>Bayesian Analysis</h2><img src="${i2}"><img src="${i3}"><img src="${i4}">
-${tbl}
-<div class="n"><strong>Bayesian fingerprint:</strong> ${V[fp.match]?V[fp.match].label:fp.match} (${fp.confidence} confidence, ${fp.match===v.verdict?'agrees':'diverges'})<br><br>
-<strong>Skeptical prior:</strong> Pr(MCID benefit) = ${pct(sk.pMCID)}, Pr(ROPE) = ${pct(sk.pROPE)}, Pr(severe harm) = ${pct(sk.pSevereHarm)}.<br>
-I² = ${I2}%${I2<25?' — robust to prior choice.':'.'}
-</div>
-<h2>References</h2><p style="font-size:.85rem;color:#555">Zampieri FG et al. <em>AJRCCM</em> 2021;203:543–552.<br>Pocock SJ, Stone GW. <em>NEJM</em> 2016;375:861–870.<br>Hawkins AT, Samuels JD. <em>JAMA</em> 2021;326:1875–76.<br>Altman DG, Bland JM. <em>BMJ</em> 1995;311:485.<br>Kruschke JK. <em>Adv Methods Pract Psychol Sci</em> 2018 (ROPE).</p>
-<footer>RCT Verdict Classifier · Prof. Ibrahim Halil Tanboga, MD, PhD · Nisantasi University</footer></body></html>`;
-  const blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=(d.studyName||'rct-verdict').replace(/\s+/g,'-').toLowerCase()+'-report.html';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-}
+toggleInputMethod();
+syncRadioChips();
 </script>
 </body>
 </html>
