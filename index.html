@@ -79,7 +79,7 @@ input:focus,select:focus{border-color:var(--primary)}
 .narrative strong{color:var(--primary-deep)}
 /* Download */
 .download-row{display:flex;justify-content:center;padding:8px 0 4px}
-#ciForestPlot,#posteriorDensityPlot,#sensitivityBarChart{width:100%;min-height:10px}
+#ciForestPlot,#posteriorDensityPlot,#cdfPlot,#forestPlot{width:100%;min-height:10px}
 </style>
 </head>
 <body>
@@ -178,7 +178,8 @@ input:focus,select:focus{border-color:var(--primary)}
   <div class="card">
     <div class="card-title">Bayesian Complementary Analysis</div>
     <div id="posteriorDensityPlot"></div>
-    <div id="sensitivityBarChart" style="margin-top:12px"></div>
+    <div id="cdfPlot" style="margin-top:12px"></div>
+    <div id="forestPlot" style="margin-top:12px"></div>
     <div id="bayesTableContainer" style="margin-top:16px;overflow-x:auto"></div>
     <div id="bayesFingerprint"></div>
     <div id="bayesNarrative"></div>
@@ -361,9 +362,9 @@ function classify(ciL,ciU,mcidB,mcidH){
 function buildPriors(expEff,mcidB,mcidH){
   const lE=Math.log(expEff),lH=Math.log(mcidH);
   return[
-    {name:'Skeptical',mean:0,sd:.355,color:'#2563eb',desc:'N(0, 0.355²) — no expected effect'},
-    {name:'Optimistic',mean:lE,sd:priorSD(lE,.15),color:'#16a34a',desc:`Centered at ${expEff}; Pr(harm)≈15%`},
-    {name:'Pessimistic',mean:lH,sd:priorSD(lH,.15),color:'#dc2626',desc:`Centered at ${mcidH}; Pr(benefit)≈15%`}
+    {name:'Skeptical',mean:0,sd:.355,color:'#15736b',desc:'N(0, 0.355²) — no expected effect'},
+    {name:'Optimistic',mean:lE,sd:priorSD(lE,.15),color:'#17775d',desc:`Centered at ${expEff}; Pr(harm)≈15%`},
+    {name:'Pessimistic',mean:lH,sd:priorSD(lH,.15),color:'#c5673a',desc:`Centered at ${mcidH}; Pr(benefit)≈15%`}
   ];
 }
 
@@ -452,9 +453,17 @@ function renderPosterior(br,data){
   const xMn=Math.min(...aM.map((m,i)=>m-3.5*aS[i])),xMx=Math.max(...aM.map((m,i)=>m+3.5*aS[i]));
   const N=300,xs=[...Array(N)].map((_,i)=>xMn+(xMx-xMn)*i/(N-1));
   const traces=[];
-  br.forEach(r=>{
-    if(r.sd<5)traces.push({x:xs.map(Math.exp),y:xs.map(x=>normalPDF(x,r.mean,r.sd)/Math.exp(x)),mode:'lines',line:{color:r.color,width:1.5,dash:'dot'},opacity:.4,name:r.name+' prior',hoverinfo:'skip'});
-    traces.push({x:xs.map(Math.exp),y:xs.map(x=>normalPDF(x,r.post.mean,r.post.sd)/Math.exp(x)),mode:'lines',line:{color:r.color,width:2.5},name:r.name,hovertemplate:`${r.name}<br>${measure}: %{x:.3f}<extra></extra>`});
+  br.forEach((r,ri)=>{
+    if(r.sd<5)traces.push({x:xs.map(Math.exp),y:xs.map(x=>normalPDF(x,r.mean,r.sd)/Math.exp(x)),mode:'lines',line:{color:r.color,width:1.5,dash:'dot'},opacity:.35,name:r.name+' prior',hoverinfo:'skip',showlegend:false});
+    const postY=xs.map(x=>normalPDF(x,r.post.mean,r.post.sd)/Math.exp(x));
+    traces.push({x:xs.map(Math.exp),y:postY,mode:'lines',line:{color:r.color,width:2.5},name:r.name,hovertemplate:`${r.name}<br>${measure}: %{x:.3f}<extra></extra>`});
+    // Benefit fill (green) and harm fill (red) for first prior only
+    if(ri===0){
+      const bX=[],bY=[],hX=[],hY=[];
+      xs.forEach((x,i)=>{if(x<0){bX.push(Math.exp(x));bY.push(postY[i]);}if(x>0){hX.push(Math.exp(x));hY.push(postY[i]);}});
+      if(bX.length>1)traces.push({x:[...bX,bX[bX.length-1],bX[0]],y:[...bY,0,0],fill:'toself',fillcolor:'rgba(23,119,93,.12)',line:{width:0},showlegend:false,hoverinfo:'skip',name:'_benefit'});
+      if(hX.length>1)traces.push({x:[...hX,hX[hX.length-1],hX[0]],y:[...hY,0,0],fill:'toself',fillcolor:'rgba(197,103,58,.12)',line:{width:0},showlegend:false,hoverinfo:'skip',name:'_harm'});
+    }
   });
   const xMnR=Math.exp(xMn),xMxR=Math.exp(xMx);
   Plotly.newPlot('posteriorDensityPlot',traces,{
@@ -473,14 +482,80 @@ function renderPosterior(br,data){
 }
 
 // ============================================================
-// RENDER: Sensitivity Bar
+// RENDER: CDF Plot (matching bayesian-trial-reanalysis style)
 // ============================================================
-function renderSensBar(br,I2){
-  Plotly.newPlot('sensitivityBarChart',[
-    {name:'Pr(MCID benefit)',x:br.map(r=>r.name),y:br.map(r=>r.pMCID*100),type:'bar',marker:{color:br.map(r=>r.color),opacity:.85},hovertemplate:'%{x}<br>Pr(MCID benefit): %{y:.1f}%<extra></extra>'}
-  ],{barmode:'group',height:220,margin:{l:45,r:20,t:30,b:50},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
-    title:{text:`Pr(MCID benefit) by Prior — I² = ${I2}%${I2<25?' (robust)':I2<50?' (moderate)':' (sensitive)'}`,font:{size:12}},
-    xaxis:{title:{text:'Prior',font:{size:11}}},yaxis:{range:[0,100],title:{text:'%',font:{size:11}},gridcolor:'#eeeeda'},showlegend:false
+function renderCDF(br,data){
+  const{mcidBenefit:mB,mcidHarm:mH,measure}=data;
+  const xMin=0.3,xMax=3.0,N=200;
+  const xVals=[...Array(N)].map((_,i)=>xMin+(xMax-xMin)*i/(N-1));
+  const traces=[];
+  br.forEach(r=>{
+    // P(ratio < threshold) for each threshold x — CDF
+    const yVals=xVals.map(x=>normalCDF(Math.log(x),r.post.mean,r.post.sd));
+    traces.push({x:xVals,y:yVals,mode:'lines',name:r.name,line:{color:r.color,width:2.5},
+      hovertemplate:`${r.name}<br>${measure} < %{x:.2f}: %{y:.1%}<extra></extra>`});
+  });
+  // Markers at key thresholds for skeptical prior
+  const sk=br.find(r=>r.name==='Skeptical');
+  if(sk){
+    const keys=[{x:1.0,label:'Pr(benefit)',color:'#17775d'},{x:mB,label:'Pr(MCID benefit)',color:'#2e7d32'},{x:mH,label:`Pr(${measure}<${mH})`,color:'#c62828'}];
+    keys.forEach(k=>{
+      const y=normalCDF(Math.log(k.x),sk.post.mean,sk.post.sd);
+      traces.push({x:[k.x],y:[y],mode:'markers+text',marker:{size:10,color:k.color,symbol:'circle'},
+        text:[`${(y*100).toFixed(0)}%`],textposition:'top right',textfont:{size:10,color:k.color},
+        showlegend:false,hovertemplate:`${k.label}: ${(y*100).toFixed(1)}%<extra></extra>`});
+    });
+  }
+  Plotly.newPlot('cdfPlot',traces,{
+    height:280,margin:{l:50,r:20,t:30,b:50},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
+    title:{text:'Cumulative Distribution Function — P('+measure+' < threshold)',font:{size:12}},
+    legend:{orientation:'h',y:-.22,x:.5,xanchor:'center',font:{size:11}},
+    xaxis:{type:'log',range:[Math.log10(xMin),Math.log10(xMax)],title:{text:measure+' threshold',font:{size:11}},
+      tickvals:[.3,.5,.7,.8,1,1.25,1.5,2,3],tickformat:'.2g',gridcolor:'#eeeeda'},
+    yaxis:{range:[0,1],title:{text:'Cumulative Probability',font:{size:11}},gridcolor:'#eeeeda',
+      tickvals:[0,.1,.25,.5,.75,.9,1],tickformat:'.0%'},
+    shapes:[
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(1),x1:Math.log10(1),y0:0,y1:1,line:{color:'#888',dash:'dot',width:1}},
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1}},
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1}}
+    ]
+  },{displayModeBar:false,responsive:true});
+}
+
+// ============================================================
+// RENDER: Forest Plot (matching bayesian-trial-reanalysis style)
+// ============================================================
+function renderForestBayes(br,data,I2){
+  const{measure,mcidBenefit:mB,mcidHarm:mH}=data;
+  const names=br.map(r=>r.name).reverse();
+  const meds=br.map(r=>r.postMedian).reverse();
+  const loCI=br.map(r=>r.crIL).reverse();
+  const hiCI=br.map(r=>r.crIH).reverse();
+  const colors=br.map(r=>r.color).reverse();
+
+  const traces=[
+    // CrI lines
+    ...br.map((r,i)=>({
+      x:[loCI[i],hiCI[i]],y:[names[i],names[i]],mode:'lines',
+      line:{color:colors[i],width:3},showlegend:false,hoverinfo:'skip'
+    })),
+    // Point estimates
+    {x:meds,y:names,mode:'markers',marker:{size:12,color:colors,symbol:'diamond',line:{color:'#fff',width:1.5}},
+     showlegend:false,hovertemplate:'%{y}<br>'+measure+': %{x:.3f}<extra></extra>'}
+  ];
+
+  const xMin=Math.min(.3,Math.min(...loCI)*.85),xMax=Math.max(2,Math.max(...hiCI)*1.15);
+  Plotly.newPlot('forestPlot',traces,{
+    height:180,margin:{l:90,r:20,t:30,b:50},plot_bgcolor:'#fafaf8',paper_bgcolor:'transparent',
+    title:{text:`Posterior Forest Plot — I² = ${I2}%${I2<25?' (robust)':I2<50?' (moderate)':' (sensitive)'}`,font:{size:12}},
+    xaxis:{type:'log',range:[Math.log10(xMin),Math.log10(xMax)],title:{text:measure+' (95% CrI)',font:{size:11}},
+      tickvals:[.3,.5,.7,.8,1,1.25,1.5,2,3].filter(v=>v>=xMin&&v<=xMax),tickformat:'.2g',gridcolor:'#eeeeda'},
+    yaxis:{autorange:true},
+    shapes:[
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(1),x1:Math.log10(1),y0:0,y1:1,line:{color:'#888',dash:'dot',width:1.5}},
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mB),x1:Math.log10(mB),y0:0,y1:1,line:{color:'#2e7d32',dash:'dash',width:1}},
+      {type:'line',xref:'x',yref:'paper',x0:Math.log10(mH),x1:Math.log10(mH),y0:0,y1:1,line:{color:'#c62828',dash:'dash',width:1}}
+    ]
   },{displayModeBar:false,responsive:true});
 }
 
@@ -613,7 +688,7 @@ function runClassifier(){
   _d=d;_v=v;_b=br;
   renderBanner(v,d);renderForest(d,v);
   document.getElementById('freqReasoning').innerHTML=freqNarrative(v,d);
-  renderPosterior(br,d);renderSensBar(br,I2);renderTable(br,d.measure);
+  renderPosterior(br,d);renderCDF(br,d);renderForestBayes(br,d,I2);renderTable(br,d.measure);
   renderFingerprint(br,v);
   document.getElementById('bayesNarrative').innerHTML=bayesNarrative(br,I2,d.mcidBenefit,d.measure);
   renderFigures(v);
@@ -627,10 +702,11 @@ function runClassifier(){
 async function downloadReport(){
   if(!_d)return;
   const d=_d,v=_v,br=_b,meta=V[v.verdict],{I2}=calcI2(br);
-  const[i1,i2,i3]=await Promise.all([
+  const[i1,i2,i3,i4]=await Promise.all([
     Plotly.toImage(document.getElementById('ciForestPlot'),{format:'svg',width:800,height:180}),
     Plotly.toImage(document.getElementById('posteriorDensityPlot'),{format:'svg',width:800,height:320}),
-    Plotly.toImage(document.getElementById('sensitivityBarChart'),{format:'svg',width:800,height:220})
+    Plotly.toImage(document.getElementById('cdfPlot'),{format:'svg',width:800,height:280}),
+    Plotly.toImage(document.getElementById('forestPlot'),{format:'svg',width:800,height:180})
   ]);
   let tbl='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="background:#f5f4f0"><th style="padding:8px;text-align:left;border-bottom:2px solid #ddd">Prior</th><th style="padding:8px;border-bottom:2px solid #ddd">Posterior</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(benefit)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(MCID)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(ROPE)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(harm)</th><th style="padding:8px;border-bottom:2px solid #ddd">Pr(severe harm)</th></tr></thead><tbody>';
   br.forEach(r=>{tbl+=`<tr><td style="padding:8px;border-bottom:1px solid #eee"><strong>${r.name}</strong></td><td style="padding:8px;border-bottom:1px solid #eee">${d.measure} ${r.postMedian.toFixed(3)} (${r.crIL.toFixed(3)}–${r.crIH.toFixed(3)})</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pBenefit)}</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${pct(r.pMCID)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pROPE)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pHarm)}</td><td style="padding:8px;border-bottom:1px solid #eee">${pct(r.pSevereHarm)}</td></tr>`;});
@@ -646,7 +722,7 @@ async function downloadReport(){
 <div class="vt">${meta.tag}</div></div>
 <h2>Frequentist Classification</h2><img src="${i1}">
 ${v.R.map(s=>`<div class="st"><span class="sn">${s.n}</span><span>${s.t}</span></div>`).join('')}
-<h2>Bayesian Analysis</h2><img src="${i2}"><img src="${i3}">
+<h2>Bayesian Analysis</h2><img src="${i2}"><img src="${i3}"><img src="${i4}">
 ${tbl}
 <div class="n"><strong>Bayesian fingerprint:</strong> ${V[fp.match]?V[fp.match].label:fp.match} (${fp.confidence} confidence, ${fp.match===v.verdict?'agrees':'diverges'})<br><br>
 <strong>Skeptical prior:</strong> Pr(MCID benefit) = ${pct(sk.pMCID)}, Pr(ROPE) = ${pct(sk.pROPE)}, Pr(severe harm) = ${pct(sk.pSevereHarm)}.<br>

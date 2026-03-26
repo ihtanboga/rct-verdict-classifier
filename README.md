@@ -37,6 +37,30 @@ The most commonly confused pair. The tool uses **ROPE** (Region of Practical Equ
 - **Neutral**: CI entirely within ROPE [0.91, 1.10] — *"treatments are the same"*
 - **Negative**: CI above MCID-benefit but extends beyond ROPE — *"doesn't work, but not proven equivalent"*
 
+## Framework Figures
+
+### Decision Algorithm
+
+![Decision Algorithm](figures/ci_mcid_decision_algorithm.svg)
+
+### CI + MCID: 6 Classification Scenarios
+
+![6 Scenarios](figures/ci_mcid_classification_scenarios.svg)
+
+### Three Faces of p > 0.05
+
+![Three Faces](figures/p_nonsig_three_scenarios_english.svg)
+
+### Negative vs Neutral
+
+![Negative vs Neutral](figures/negative_vs_neutral_comparison.svg)
+
+### Underpowered Trials
+
+![Underpowered](figures/underpowered_visual_explanation.svg)
+
+---
+
 ## Features
 
 - **Multiple input formats**: HR, RR, OR with 95% CI; 2x2 event counts
